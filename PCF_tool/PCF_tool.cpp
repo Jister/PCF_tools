@@ -373,13 +373,20 @@ int pcf_tool::update_cb(NXOpen::BlockStyler::UIBlock* block)
 					if(feature.size()>0)
 					{
 						//get value of "TubeCallout" from feature
-						strcpy(stock_name, feature[0]->GetStringUserAttribute("TubeCallout",0).GetLocaleText());
-						strcpy(pcf_name, current_path);
-						strcat(pcf_name, stock_name);
-						strcat(pcf_name, ".pcf");
+						 
+						if(feature[0]->HasUserAttribute("TubeCallout",NXOpen::NXObject::AttributeTypeString,0))
+						{
+							strcpy(stock_name, feature[0]->GetStringUserAttribute("TubeCallout",0).GetLocaleText());
+							strcpy(pcf_name, current_path);
+							strcat(pcf_name, stock_name);
+							strcat(pcf_name, ".pcf");
 
-						//create PCF file
-						status = create_tube_file( UF_ASSEM_ask_work_part() , stocks->Tag() , pcf_name ); 
+							//create PCF file
+							status = create_tube_file( UF_ASSEM_ask_work_part() , stocks->Tag() , pcf_name ); 
+						}else
+						{
+							uc1601("The stock doesn't have the TubeCallout attribute!",1);
+						}
 					}else
 					{
 						uc1601("Can't find the feature from stock! PCF generation uncomplete!",1);
