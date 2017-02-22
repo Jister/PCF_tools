@@ -217,6 +217,8 @@ int pcf_tool::update_cb(NXOpen::BlockStyler::UIBlock* block)
 		UF_initialize();
         if(block == button0)
         {
+			pcf_generation pcf_generate;
+
 			int status = ERROR_OK;
 			char pcf_name[ MAX_FSPEC_BUFSIZE ] = "";
 
@@ -254,7 +256,7 @@ int pcf_tool::update_cb(NXOpen::BlockStyler::UIBlock* block)
 				}
 
 				std::vector<Assemblies::Component*> components;
-				getComponents(components);
+				pcf_generate.getComponents(components);
 
 				//====find X06EA and X06EB and set the NPS and NPS_OUT for port=====
 				for(int it_comp = 0; it_comp < components.size(); it_comp++)
@@ -296,7 +298,7 @@ int pcf_tool::update_cb(NXOpen::BlockStyler::UIBlock* block)
 					}
 				}
 				//================================================================
-				status = create_component_file( UF_ASSEM_ask_work_part(), pcf_name ); 
+				status = pcf_generate.create_component_file( UF_ASSEM_ask_work_part(), pcf_name ); 
 
 				//***Add by CJ*****update the reference set
 				for(std::vector<DisplayableObject*>::iterator it = display_obj.begin(); it != display_obj.end(); it++)
@@ -332,8 +334,9 @@ int pcf_tool::update_cb(NXOpen::BlockStyler::UIBlock* block)
         }
         else if(block == button01)
         {
-			int status = ERROR_OK;
+			pcf_generation pcf_generate;
 
+			int status = ERROR_OK;
 			UF_print_syslog( "Beginning PCF Generation...\n", FALSE );
 			UF_UI_set_status( "Beginning PCF Generation..." );
 
@@ -382,7 +385,7 @@ int pcf_tool::update_cb(NXOpen::BlockStyler::UIBlock* block)
 							strcat(pcf_name, ".pcf");
 
 							//create PCF file
-							status = create_tube_file( UF_ASSEM_ask_work_part() , stocks->Tag() , pcf_name ); 
+							status = pcf_generate.create_tube_file( UF_ASSEM_ask_work_part() , stocks->Tag() , pcf_name ); 
 						}else
 						{
 							uc1601("The stock doesn't have the TubeCallout attribute!",1);
@@ -436,6 +439,32 @@ int pcf_tool::ok_cb()
         pcf_tool::theUI->NXMessageBox()->Show("Block Styler", NXOpen::NXMessageBox::DialogTypeError, ex.what());
     }
     return errorCode;
+}
+
+void pcf_tool::Splite(string input_str, char* symbol, vector<string>& output_str)
+{
+	const int len = strlen(symbol);
+	size_t index = 0;  
+    size_t pos = input_str.find(symbol,index); 
+	while(pos != string::npos)  
+    {  
+        string ss = input_str.substr(index,pos-index);  
+		if(!ss.empty())
+		{
+			output_str.push_back(ss); 
+		}
+        index = pos + len;  
+        pos = input_str.find(symbol,index);  
+    }
+	if((index+1) < input_str.length())  
+    {  
+        string ss = input_str.substr(index,input_str.length() - index);  
+		if(!ss.empty())
+		{
+			output_str.push_back(ss); 
+		}
+    }  
+	return;
 }
 
 //------------------------------------------------------------------------------

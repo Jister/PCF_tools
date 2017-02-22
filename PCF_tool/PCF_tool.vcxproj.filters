@@ -29,10 +29,10 @@
     <ClInclude Include="pcf_tool.hpp">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="ufd_route_pcf_generation.h">
+    <ClInclude Include="UFD_Routing_Plugins_Exports.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="UFD_Routing_Plugins_Exports.h">
+    <ClInclude Include="ufd_route_pcf_generation.hpp">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>

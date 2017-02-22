@@ -24,7 +24,7 @@
 #include <NXOpen/BlockStyler_Group.hxx>
 #include <NXOpen/BlockStyler_Button.hxx>
 
-#include "ufd_route_pcf_generation.h"
+#include "ufd_route_pcf_generation.hpp"
 
 //------------------------------------------------------------------------------
 // Namespaces needed for following template
@@ -55,6 +55,7 @@ public:
     int apply_cb();
     int ok_cb();
     int update_cb(NXOpen::BlockStyler::UIBlock* block);
+	void Splite(string input_str, char* symbol, vector<string>& output_str);
     PropertyList* GetBlockProperties(const char *blockID);
     
 private:

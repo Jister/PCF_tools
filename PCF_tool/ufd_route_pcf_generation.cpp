@@ -1,4 +1,4 @@
-#include "ufd_route_pcf_generation.h"
+#include "ufd_route_pcf_generation.hpp"
 
 using namespace std;
 using namespace NXOpen;
@@ -30,49 +30,30 @@ char pcf_item_attrs[10][32]= {
  };
 int n_pcf_item_attrs = 10;
 
-std::vector<Assemblies::Component*> components;
-std::vector<pointinfo> control_point;
-std::vector<weldinfo> additional_weld;
-Session *mySession = Session::GetSession();
-Part *workPart(mySession->Parts()->Work());
-Part *displayPart(mySession->Parts()->Display());
-
-/*==========================================================================
-   LOCAL MACRO DEFINITIONS
-**==========================================================================*/
-/* This macro should be called after ever UG/OPEN function.  It will display 
-   the error message (if one is present) to a modal message box */
 #define CHECK_STATUS  if( status != ERROR_OK ) handle_status_error( status );
 
-void ECHO(char *format, ...)
-{
-    char msg[UF_UI_MAX_STRING_NCHARS+1];
-    va_list args;
-    va_start(args, format);
-    vsnprintf_s(msg, sizeof(msg), UF_UI_MAX_STRING_NCHARS, format, args);
-    va_end(args);
-    UF_UI_open_listing_window();
-    UF_UI_write_listing_window(msg);
-    UF_print_syslog(msg, FALSE);
-}
+Session *(pcf_generation::mySession) = NULL;
 
-#define UF_CALL(X) (report_error( __FILE__, __LINE__, #X, (X)))
-
-int report_error( char *file, int line, char *call, int irc)
+pcf_generation::pcf_generation()
 {
-    if (irc)
+    try
     {
-        char err[133];
+        pcf_generation::mySession = NXOpen::Session::GetSession();
+		workPart = mySession->Parts()->Work();
+		displayPart = mySession->Parts()->Display();
 
-        UF_get_fail_message(irc, err);
-        ECHO("*** ERROR code %d at line %d in %s:\n",
-            irc, line, file);
-        ECHO("+++ %s\n", err);
-        ECHO("%s;\n", call);
     }
-
-    return(irc);
+    catch(exception& ex)
+    {
+        throw;
+    }
 }
+
+pcf_generation::~pcf_generation()
+{
+
+}
+
 
 /**********************************************************************
 * Function Name: validate_pcf_file_name
@@ -88,7 +69,7 @@ int report_error( char *file, int line, char *call, int irc)
 *                                string is empty if an error occurs.
 * Returns: ERROR_OK or error code 
 ***********************************************************************/
-int validate_pcf_file_name( char pcf_file_name[] )
+int pcf_generation::validate_pcf_file_name( char pcf_file_name[] )
 {
    int status = ERROR_OK;
    logical display_dialog = FALSE;
@@ -192,7 +173,7 @@ int validate_pcf_file_name( char pcf_file_name[] )
 * Output: None
 * Returns: None
 ***********************************************************************/
-void handle_status_error( int status )
+void pcf_generation::handle_status_error( int status )
 {
   char message[133];
   char err_msg[133];
@@ -218,7 +199,7 @@ void handle_status_error( int status )
  * OUTPUT
  *      out_charx - charx value - calling routine supplies enough memory 
 *********************************************************************/
-int get_part_number_charx
+int pcf_generation::get_part_number_charx
 ( 
     int charx_count,
     UF_ROUTE_charx_p_t charx_list,
@@ -271,7 +252,7 @@ int get_part_number_charx
  * OUTPUT
  *      out_charx - charx value - calling routine supplies enough memory 
 *********************************************************************/
-int get_material_charx
+int pcf_generation::get_material_charx
 ( 
     int charx_count,
     UF_ROUTE_charx_p_t charx_list,
@@ -325,7 +306,7 @@ int get_material_charx
 * 
 * Returns: ERROR_OK or UF_err_operation_aborted
 ***********************************************************************/
-int create_component_file( tag_t part_tag,
+int pcf_generation::create_component_file( tag_t part_tag,
                                   char *pcf_name)
 {
    FILE * pcf_stream = NULL;
@@ -461,8 +442,7 @@ int create_component_file( tag_t part_tag,
    return( status ); 
 }
 
-
-int create_tube_file( tag_t part_tag,
+int pcf_generation::create_tube_file( tag_t part_tag,
 								  tag_t stock_tag,
                                   char *pcf_name)
 {
@@ -597,7 +577,7 @@ int create_tube_file( tag_t part_tag,
    return( status ); 
 }
 
-int build_tube_components( tag_t part_tag,
+int pcf_generation::build_tube_components( tag_t part_tag,
 							 tag_t stock_tag,
                              FILE * pcf_stream,
                              FILE * material_stream )
@@ -804,7 +784,7 @@ int build_tube_components( tag_t part_tag,
 *        FILE * file_stream - the file stream to write to
 * Returns: ERROR_OK or UF_err_operation_aborted
 ***********************************************************************/
-int write_string(char *string,
+int pcf_generation::write_string(char *string,
                         FILE *file_stream )
 
 {
@@ -838,7 +818,7 @@ int write_string(char *string,
 * 
 * Returns: ERROR_OK or UF_err_operation_aborted
 ***********************************************************************/
-int close_files( FILE * pcf_stream,
+int pcf_generation::close_files( FILE * pcf_stream,
                         FILE * material_stream ) 
 {
    int status = ERROR_OK;
@@ -873,7 +853,7 @@ int close_files( FILE * pcf_stream,
 * Returns: ERROR_OK or UF_err_operation_aborted
 *
 ***********************************************************************/
-int build_header(tag_t part_tag,
+int pcf_generation::build_header(tag_t part_tag,
                         FILE * file_stream )
 
 {
@@ -926,7 +906,7 @@ int build_header(tag_t part_tag,
  * Output: <updates the pcf_comp_attrs with the preference>
  * Returns:
  */
-void get_comp_attr_titles (void)
+void pcf_generation::get_comp_attr_titles (void)
 {
     UF_ROUTE_user_preference_t prefs;
 
@@ -965,7 +945,7 @@ void get_comp_attr_titles (void)
  * Output: <updates the pcf_comp_attrs with the preference>
  * Returns:
  */
-void get_item_attr_titles (void)
+void pcf_generation::get_item_attr_titles (void)
 {
     UF_ROUTE_user_preference_t prefs;
 
@@ -1008,7 +988,7 @@ void get_item_attr_titles (void)
 * 
 * Returns: ERROR_OK or UF_err_operation_aborted
 ***********************************************************************/
-int add_pipeline_attributes( tag_t part_tag,
+int pcf_generation::add_pipeline_attributes( tag_t part_tag,
                                FILE * pcf_stream )
 {
     int i = 0;
@@ -1060,7 +1040,7 @@ int add_pipeline_attributes( tag_t part_tag,
 * 
 * Returns: ERROR_OK or UF_err_operation_aborted
 ***********************************************************************/
-int build_pipeline_ref( tag_t part_tag,
+int pcf_generation::build_pipeline_ref( tag_t part_tag,
                                FILE * pcf_stream )
 {
    char pipeline_name[ MAX_FSPEC_BUFSIZE ];
@@ -1182,7 +1162,7 @@ int build_pipeline_ref( tag_t part_tag,
  *  Returns:
  *      TRUE if the item exists
  */
-logical item_exists_in_array
+logical pcf_generation::item_exists_in_array
 (
     tag_t item,
     tag_t *array,
@@ -1216,7 +1196,7 @@ logical item_exists_in_array
                             by the user with UF_free
   Return: ERROR_OK or error_code                                         
 **==========================================================================*/
-int get_stock_in_part( tag_t part, 
+int pcf_generation::get_stock_in_part( tag_t part, 
                               int * num_stocks,
                               tag_t ** stocks )
 {
@@ -1301,7 +1281,7 @@ int get_stock_in_part( tag_t part,
 Note: Initially this routine was needed only for lateral butt weld parts 
 hence the name. Now, this is a generic routine used frequently.
 **==========================================================================*/
-void get_lateral_butt_weld_center_point ( double pnt1[3], 
+void pcf_generation::get_lateral_butt_weld_center_point ( double pnt1[3], 
                                                  double pnt2[3], 
                                                  double vec1[3], 
                                                  double vec2[3], 
@@ -1378,7 +1358,7 @@ void get_lateral_butt_weld_center_point ( double pnt1[3],
                             by the user with UF_free
   Return: ERROR_OK or error_code                                         
 **==========================================================================*/
-int get_tee_set_on_components( tag_t part, 
+int pcf_generation::get_tee_set_on_components( tag_t part, 
                               int * num_rcps,
                               tag_t ** rcps )
 {
@@ -1472,7 +1452,7 @@ int get_tee_set_on_components( tag_t part,
 * 
 * Returns: ERROR_OK or UF_err_operation_aborted
 ***********************************************************************/
-int get_center_and_branch_points_for_tee_set_on ( tag_t rcp,
+int pcf_generation::get_center_and_branch_points_for_tee_set_on ( tag_t rcp,
                                          int charx_count,
                                          UF_ROUTE_charx_p_t charx_list, 
                                          double center_pt[3],
@@ -1570,7 +1550,7 @@ int get_center_and_branch_points_for_tee_set_on ( tag_t rcp,
 *    end_pt1  ( I/O ) - current position/adjusted position for rcp1
 *    end_pt2  ( I/O ) - current position/adjusted position for rcp2
 */
-void adjust_end_pts_for_tee_set_on 
+void pcf_generation::adjust_end_pts_for_tee_set_on 
 ( 
     tag_t  end_rcps[2], 
     double end_pt1[3], 
@@ -1706,7 +1686,7 @@ void adjust_end_pts_for_tee_set_on
 *    
 * Returns: ERROR_OK or 1
 */
-int has_part_no_and_material
+int pcf_generation::has_part_no_and_material
 (
     tag_t comp_tag,
     int charx_count,
@@ -1781,7 +1761,7 @@ int has_part_no_and_material
  *  1  -  If valid UDO
  *  0  -  If invalid 
  */
-int ensure_bolt_udo ( tag_t part_tag, tag_t udo_tag, tag_t gasket )
+int pcf_generation::ensure_bolt_udo ( tag_t part_tag, tag_t udo_tag, tag_t gasket )
 {
     int is_valid = FALSE;
     tag_t connection = NULL_TAG;
@@ -1831,7 +1811,7 @@ int ensure_bolt_udo ( tag_t part_tag, tag_t udo_tag, tag_t gasket )
  *
  * Use the charx on gasket to find the values for above parameters
  */
- void get_bolt_length ( int charx_count,
+ void pcf_generation::get_bolt_length ( int charx_count,
                                UF_ROUTE_charx_p_t charx_list,
                                double bolt_diameter,
                                double *length )
@@ -1885,7 +1865,7 @@ int ensure_bolt_udo ( tag_t part_tag, tag_t udo_tag, tag_t gasket )
 * using 2* (flange_thickness +  flange_face_depth + flange_tol) + bolt_dia + gasket thickness
 * 
 */
-void write_bolts_info 
+void pcf_generation::write_bolts_info 
 ( 
     tag_t part_tag,      /* Work part */
     tag_t comp_tag,      /* Gasket */ 
@@ -2056,7 +2036,7 @@ void write_bolts_info
  * Output
  * Returns
  */
-void apply_component_attribute ( int counter, tag_t obj_tag, char* title, FILE * pcf_stream )
+void pcf_generation::apply_component_attribute ( int counter, tag_t obj_tag, char* title, FILE * pcf_stream )
 {
       int found = 0;
       char attr_value[ MAX_LINE_BUFSIZE ] ="";
@@ -2125,7 +2105,7 @@ void apply_component_attribute ( int counter, tag_t obj_tag, char* title, FILE *
 * 
 * Returns: ERROR_OK or UF_err_operation_aborted
 ***********************************************************************/
-int build_components( tag_t part_tag,
+int pcf_generation::build_components( tag_t part_tag,
                              FILE * pcf_stream,
                              FILE * material_stream )
 {
@@ -2997,7 +2977,7 @@ int build_components( tag_t part_tag,
 * 
 * Returns: ERROR_OK or UF_err_operation_aborted
 ***********************************************************************/
-int write_component_id( int charx_count,
+int pcf_generation::write_component_id( int charx_count,
                                UF_ROUTE_charx_p_t charx_list,
                                FILE * pcf_stream )
 
@@ -3071,7 +3051,7 @@ int write_component_id( int charx_count,
 * 
 * Returns: ERROR_OK or UF_err_operation_aborted
 **************************************************************************/
-int find_nps_branch_index ( int charx_count, 
+int pcf_generation::find_nps_branch_index ( int charx_count, 
                                  UF_ROUTE_charx_p_t charx_list, 
                                  int* index )
 {
@@ -3109,7 +3089,7 @@ int find_nps_branch_index ( int charx_count,
 * 
 * Returns: ERROR_OK or UF_err_operation_aborted
 ***********************************************************************/
-int write_end_points( double end_pt1[3],
+int pcf_generation::write_end_points( double end_pt1[3],
                              double end_pt2[3],
                              double inDiameter,
                              double outDiameter,
@@ -3162,7 +3142,7 @@ int write_end_points( double end_pt1[3],
 *     error code (ERROR_raise) if error 
 *
 ***********************************************************************/
-int write_item_code( int charx_count,
+int pcf_generation::write_item_code( int charx_count,
                             UF_ROUTE_charx_p_t charx_list,
                             tag_t comp_tag,
                             FILE * pcf_stream,
@@ -3257,7 +3237,7 @@ int write_item_code( int charx_count,
 * 
 * Returns: ERROR_OK or UF_err_operation_aborted
 ***********************************************************************/
-int build_materials( int charx_count,
+int pcf_generation::build_materials( int charx_count,
                             UF_ROUTE_charx_p_t charx_list,
                             tag_t comp_tag,
                             FILE * material_stream )
@@ -3389,7 +3369,7 @@ int build_materials( int charx_count,
 *        FILE * pcf_stream - channel number of PCF file
 * Returns: ERROR_OK or UF_err_operation_aborted
 ***********************************************************************/
-int write_weight( int charx_count,
+int pcf_generation::write_weight( int charx_count,
                          UF_ROUTE_charx_p_t charx_list,
                          FILE * pcf_stream )
 
@@ -3458,7 +3438,7 @@ int write_weight( int charx_count,
 * 
 * Returns: ERROR_OK or UF_err_operation_aborted
 ***********************************************************************/
-int write_skey( int charx_count,
+int pcf_generation::write_skey( int charx_count,
                        UF_ROUTE_charx_p_t charx_list,
                        FILE * pcf_stream )
 
@@ -3545,7 +3525,7 @@ int write_skey( int charx_count,
 * 
 * Returns: ERROR_OK or UF_err_operation_aborted
 ***********************************************************************/
-int write_center_point( tag_t part_tag,
+int pcf_generation::write_center_point( tag_t part_tag,
                                tag_t comp_tag,
                                int charx_count, 
                                UF_ROUTE_charx_p_t charx_list,
@@ -3733,7 +3713,7 @@ int write_center_point( tag_t part_tag,
 * 
 * Returns: ERROR_OK or UF_err_operation_aborted
 ***********************************************************************/
-int ask_comp_anchors(tag_t part_tag, tag_t comp_tag, 
+int pcf_generation::ask_comp_anchors(tag_t part_tag, tag_t comp_tag, 
                             int *num_anchors, tag_t **anchor_tags)
 {
    int status = ERROR_OK;
@@ -3796,7 +3776,7 @@ int ask_comp_anchors(tag_t part_tag, tag_t comp_tag,
 * 
 * Returns: ERROR_OK or UF_err_operation_aborted
 ***********************************************************************/
-int write_angle( int charx_count,
+int pcf_generation::write_angle( int charx_count,
                         UF_ROUTE_charx_p_t charx_list,
                         FILE * pcf_stream )
 
@@ -3846,7 +3826,7 @@ int write_angle( int charx_count,
 *         pcf_stream - FILE stream of PCF
 * Returns        
 ***********************************************************************/
-void write_support_coords ( tag_t part_tag,
+void pcf_generation::write_support_coords ( tag_t part_tag,
                                    tag_t comp_tag,
                                    FILE * pcf_stream )
 {
@@ -3917,7 +3897,7 @@ void write_support_coords ( tag_t part_tag,
 * 
 * Returns: 
 ***********************************************************************/
-void write_olet_center_and_branch_points ( tag_t comp_tag,
+void pcf_generation::write_olet_center_and_branch_points ( tag_t comp_tag,
                                        FILE * pcf_stream )
 {
     logical is_fixture  = FALSE;
@@ -4043,7 +4023,7 @@ void write_olet_center_and_branch_points ( tag_t comp_tag,
 *     ERROR_OK if OK
 *     error code (ERROR_raise) if error 
 *************************************************************************/ 
-void find_start_and_end_port(tag_t* port_tags, tag_t* start_port, tag_t* end_port )
+void pcf_generation::find_start_and_end_port(tag_t* port_tags, tag_t* start_port, tag_t* end_port )
 {
 	UF_ATTR_info_t info;
 	logical has_attr = false;
@@ -4089,7 +4069,7 @@ void find_start_and_end_port(tag_t* port_tags, tag_t* start_port, tag_t* end_por
 *         double outDiameter - value found in attribute for NPS_OUT or NPS_BRANCH
 *  
 *************************************************************************/ 
-double find_nps_branch_value( tag_t* port_tags, double inDiameter )
+double pcf_generation::find_nps_branch_value( tag_t* port_tags, double inDiameter )
 {
     /* assign the outDiameter to be the same as the inDiameter.  
        It will get overwritten if one of the ports has an appropriate attribute.   */
@@ -4140,7 +4120,7 @@ double find_nps_branch_value( tag_t* port_tags, double inDiameter )
 *         double inDiameter - value found in attribute for NPS
 *  
 *************************************************************************/ 
-double determine_in_diameter ( tag_t comp_tag ) 
+double pcf_generation::determine_in_diameter ( tag_t comp_tag ) 
 {
     
     double inDiameter = 0.0;
@@ -4212,7 +4192,7 @@ double determine_in_diameter ( tag_t comp_tag )
 *         double outDiameter - value found in attribute for NPS_OUT or NPS_BRANCH
 * 
 *************************************************************************/ 
-double determine_out_diameter ( tag_t comp_tag, double inDiameter ) 
+double pcf_generation::determine_out_diameter ( tag_t comp_tag, double inDiameter ) 
 {
     
     /* assign the outDiameter to be the same as the inDiameter.  It will get overwritten if appropriate. */
@@ -4292,7 +4272,7 @@ double determine_out_diameter ( tag_t comp_tag, double inDiameter )
 *         FILE * pcf_stream   -  the pcf file 
 * 
 *************************************************************************/ 
-void write_flat_direction ( tag_t start_port, tag_t end_port, FILE * pcf_stream )
+void pcf_generation::write_flat_direction ( tag_t start_port, tag_t end_port, FILE * pcf_stream )
 {
     int status = ERROR_OK;
     double end_pt1[3] = {0};
@@ -4345,7 +4325,7 @@ void write_flat_direction ( tag_t start_port, tag_t end_port, FILE * pcf_stream 
 * 
 * Returns: ERROR_OK or UF_err_operation_aborted
 ***********************************************************************/
-int write_end_and_branch_points(tag_t part_tag,
+int pcf_generation::write_end_and_branch_points(tag_t part_tag,
                                        tag_t comp_tag,
                                        FILE * pcf_stream )
 {
@@ -4962,7 +4942,7 @@ int write_end_and_branch_points(tag_t part_tag,
 * Returns:
 *
 ***********************************************************************/
-void copy_position( double input_pos[3],
+void pcf_generation::copy_position( double input_pos[3],
                            double output_pos[3])
 {
     output_pos[0] = input_pos[0];
@@ -4972,7 +4952,7 @@ void copy_position( double input_pos[3],
 
 //*************Add by CJ******************
 
-bool check_same_point (double point_1[3], double point_2[3])
+bool pcf_generation::check_same_point (double point_1[3], double point_2[3])
 {
 	if(fabs(point_1[0] - point_2[0]) < 0.001 && fabs(point_1[1] - point_2[1]) < 0.001 && fabs(point_1[2] - point_2[2]) < 0.001)
 	{
@@ -4982,7 +4962,7 @@ bool check_same_point (double point_1[3], double point_2[3])
 	}
 }
 
-void coordinate_transform (double input[3], double output[3])
+void pcf_generation::coordinate_transform (double input[3], double output[3])
 {
 	tag_t wcs;
 	tag_t matrix_tag;
@@ -4996,19 +4976,19 @@ void coordinate_transform (double input[3], double output[3])
 	output[2] = (input[0] - wcs_origin[0])*matrix[6] + (input[1] - wcs_origin[1])*matrix[7] + (input[2] - wcs_origin[2])*matrix[8];
 }
 
-double line_length (double point_1[3], double point_2[3])
+double pcf_generation::line_length (double point_1[3], double point_2[3])
 {
 	return sqrt((point_1[0]-point_2[0])*(point_1[0]-point_2[0]) + (point_1[1]-point_2[1])*(point_1[1]-point_2[1]) + (point_1[2]-point_2[2])*(point_1[2]-point_2[2]));
 }
 
-void point_direction (double start_point[3], double end_point[3], double direction[3])
+void pcf_generation::point_direction (double start_point[3], double end_point[3], double direction[3])
 {
 	direction[0] = end_point[0] - start_point[0];
 	direction[1] = end_point[1] - start_point[1];
 	direction[2] = end_point[2] - start_point[2];
 }
 
-void getComponents(std::vector<Assemblies::Component*>& components)
+void pcf_generation::getComponents(std::vector<Assemblies::Component*>& components)
 {
 	std::vector< NXOpen::DisplayableObject*> display_obj = displayPart->ModelingViews()->WorkView()->AskVisibleObjects();
 	for(std::vector<DisplayableObject*>::iterator it = display_obj.begin(); it != display_obj.end(); it++)
@@ -5024,33 +5004,7 @@ void getComponents(std::vector<Assemblies::Component*>& components)
 	}
 }
 
-void Splite(string input_str, char* symbol, vector<string>& output_str)
-{
-	const int len = strlen(symbol);
-	size_t index = 0;  
-    size_t pos = input_str.find(symbol,index); 
-	while(pos != string::npos)  
-    {  
-        string ss = input_str.substr(index,pos-index);  
-		if(!ss.empty())
-		{
-			output_str.push_back(ss); 
-		}
-        index = pos + len;  
-        pos = input_str.find(symbol,index);  
-    }
-	if((index+1) < input_str.length())  
-    {  
-        string ss = input_str.substr(index,input_str.length() - index);  
-		if(!ss.empty())
-		{
-			output_str.push_back(ss); 
-		}
-    }  
-	return;
-}
-
-void write_stub_end_point(tag_t comp_tag, FILE * pcf_stream )
+void pcf_generation::write_stub_end_point(tag_t comp_tag, FILE * pcf_stream )
 {
     int     num_ports   = 0;
     int     status      = 0;
@@ -5205,7 +5159,7 @@ void write_stub_end_point(tag_t comp_tag, FILE * pcf_stream )
 	UF_free( ports );
 }
 
-void write_flange_blind_point(tag_t part_tag, tag_t comp_tag, FILE * pcf_stream )
+void pcf_generation::write_flange_blind_point(tag_t part_tag, tag_t comp_tag, FILE * pcf_stream )
 {
     int     num_ports   = 0;
     int     status      = 0;
