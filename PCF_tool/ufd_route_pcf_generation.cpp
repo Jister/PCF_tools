@@ -2176,40 +2176,10 @@ int pcf_generation::build_components( tag_t part_tag,
 			}
 		}
 	}
-	//for(it_label = label_collection->begin() ; it_label != label_collection->end() ; it_label ++ )	
-	//{
-	//	Annotations::Label* label = (Annotations::Label*) *it_label;
-	//	Annotations::LeaderBuilder *leader_builder =  workPart->Annotations()->CreateDraftingNoteBuilder(label)->Leader();
-	//	Annotations::LeaderDataList *leader_data_list = leader_builder->Leaders();
-
-	//	for(int i_label = 0; i_label < leader_data_list->Length(); i_label++)
-	//	{
-	//		Annotations::LeaderData *leader_data = leader_data_list->FindItem(i_label);
-	//		DisplayableObject *selection;
-	//		View *view;
-	//		Point3d point;
-	//		leader_data->Leader()->GetValue(&selection, &view, &point);
-
-	//		label_coordinate[label_number][0] = point.X;
-	//		label_coordinate[label_number][1] = point.Y;
-	//		label_coordinate[label_number][2] = point.Z;
-	//	}
-	//	label_number++;
-	//}
-	//*****************************************************************************//
 
    status = get_stock_in_part( part_tag,
                                &num_stocks,
                                &stocks );
-    /*uf_list_p_t lpObj;
-	UF_MODL_create_list(&lpObj);
-	char message1[100];
-	sprintf(message1,"stock number:%d\n",num_stocks);
-	logical is_open;
-	UF_UI_is_listing_window_open(&is_open);
-	if(!is_open) UF_UI_open_listing_window();
-	UF_UI_write_listing_window(message1);*/
-
    
    for( i = 0; i < num_stocks; i++ )
    {
@@ -2244,12 +2214,7 @@ int pcf_generation::build_components( tag_t part_tag,
                                                &segments );
          CHECK_STATUS
 
-
-			/*char message2[100];
-			sprintf(message2,"segment number:%d\n",num_segments);
-			UF_UI_write_listing_window(message2);*/
-
-			pipe_count += num_segments;
+		 pipe_count += num_segments;
 
          for ( jj = 0; jj < num_segments; jj++ )
          {
@@ -2261,33 +2226,7 @@ int pcf_generation::build_components( tag_t part_tag,
 
              status = UF_ROUTE_ask_segment_end_pnts ( segments[jj],
                                                       end_pt1_abs,
-                                                      end_pt2_abs );
-
-			 //*******判断端点是否为4寸点***************//
-			/* for (int count = 0; count < label_number; count++)
-			 {
-				 if(check_same_point(end_pt1_abs, label_coordinate[count]))
-				 {
-					 direction[0] = (end_pt1_abs[0] - end_pt2_abs[0])/line_length(end_pt1_abs, end_pt2_abs);
-					 direction[1] = (end_pt1_abs[1] - end_pt2_abs[1])/line_length(end_pt1_abs, end_pt2_abs);
-					 direction[2] = (end_pt1_abs[2] - end_pt2_abs[2])/line_length(end_pt1_abs, end_pt2_abs);
-					 end_pt1_abs[0] = end_pt1_abs[0] + direction[0] * 4;
-					 end_pt1_abs[1] = end_pt1_abs[1] + direction[1] * 4;
-					 end_pt1_abs[2] = end_pt1_abs[2] + direction[2] * 4;
-					 break;
-				 }else if(check_same_point(end_pt2_abs, label_coordinate[count]))
-				 {
-					 direction[0] = (end_pt2_abs[0] - end_pt1_abs[0])/line_length(end_pt1_abs, end_pt2_abs);
-					 direction[1] = (end_pt2_abs[1] - end_pt1_abs[1])/line_length(end_pt1_abs, end_pt2_abs);
-					 direction[2] = (end_pt2_abs[2] - end_pt1_abs[2])/line_length(end_pt1_abs, end_pt2_abs);
-					 end_pt2_abs[0] = end_pt2_abs[0] + direction[0] * 4;
-					 end_pt2_abs[1] = end_pt2_abs[1] + direction[1] * 4;
-					 end_pt2_abs[2] = end_pt2_abs[2] + direction[2] * 4;
-					 break;
-				 }
-			 }*/
-
-			
+                                                      end_pt2_abs );		
 
 			 //*****add by CJ********Transfer the coordinate to wcs************
 			 coordinate_transform(end_pt1_abs, end_pt1);
@@ -2328,18 +2267,6 @@ int pcf_generation::build_components( tag_t part_tag,
              double inDiameter  = determine_in_diameter( stock_data );
              double outDiameter = determine_out_diameter( stock_data, inDiameter );
              write_end_points( end_pt1, end_pt2, inDiameter, outDiameter, pcf_stream ); 
-			 //pointinfo point_temp;
-			 //point_temp.end_point[0] = end_pt1[0];
-			 //point_temp.end_point[1] = end_pt1[1];
-			 //point_temp.end_point[2] = end_pt1[2];
-			 //point_temp.diameter = inDiameter;
-			 //control_point.push_back(point_temp);
-			 //point_temp.end_point[0] = end_pt2[0];
-			 //point_temp.end_point[1] = end_pt2[1];
-			 //point_temp.end_point[2] = end_pt2[2];
-			 //point_temp.diameter = outDiameter;
-			 //control_point.push_back(point_temp);
-
 
 			  //*******判断端点是否为weld点,是weld点，将此直径赋予该weld***************//
 			 for (int count = 0; count < label_coordinate[0].size(); count++)
@@ -2499,8 +2426,13 @@ int pcf_generation::build_components( tag_t part_tag,
       */
       write_component_id( charx_count, charx_list, pcf_stream );
 
-      /* Outlet components need center point and branch point */
-      if( !status &&
+      if (status != ERROR_OK)
+	  {
+		  uc1601("The compent has no ISOGEN_COMPONENT_ID!",1);
+		  continue;
+	  }
+	  /* Outlet components need center point and branch point */
+      else if( !status &&
           index >= 0 &&
           charx_list[index].value.s_value != NULL &&
           strcmp( charx_list[index].value.s_value, "OLET" ) == 0 )
@@ -2532,6 +2464,14 @@ int pcf_generation::build_components( tag_t part_tag,
           //Flange Blind
           write_flange_blind_point(part_tag, comp_tag, pcf_stream );
       }
+	  else if ( !status &&
+          index >= 0 &&
+          charx_list[index].value.s_value != NULL &&
+          strcmp( charx_list[index].value.s_value, "FLANGE" ) == 0 )
+      {
+          //Flange Blind
+          write_flange_point(part_tag, comp_tag, pcf_stream );
+      }
       else
       {
           write_end_and_branch_points( part_tag, comp_tag, pcf_stream );
@@ -2545,7 +2485,7 @@ int pcf_generation::build_components( tag_t part_tag,
       */
       if (status != ERROR_OK)  
       {
-         write_center_point( part_tag, comp_tag, charx_count, charx_list, pcf_stream ); 
+         //write_center_point( part_tag, comp_tag, charx_count, charx_list, pcf_stream ); 
          status = ERROR_OK;
       }
       /*
@@ -2703,6 +2643,7 @@ int pcf_generation::build_components( tag_t part_tag,
 		double diameter = 0.0;
 		char skey_string[100];
 		char category_string[100];
+		
 	
 		Annotations::Label* label = (Annotations::Label*) *it_label_2;
 		std::vector< NXString > title = label->GetText();
@@ -2731,122 +2672,126 @@ int pcf_generation::build_components( tag_t part_tag,
 				}
 			}
 
-			bool tack_weld = false;
-			bool extra_length = false;
-			for(int k = 0; k < title.size() ; k++)
+			if(diameter > 0.0001)
 			{
-				char *title_str = new char[strlen(title[k].GetLocaleText())+1];
-				strcpy(title_str, title[k].GetLocaleText());
-				if(strstr(title_str,"TACK WELD")!= NULL)
-				{
-					tack_weld = true;
-				}
-				if(strstr(title_str,"EXTRA LENGTH")!=NULL)
-				{
-					extra_length = true;
-				}
-			}
-		
-			if(!tack_weld && extra_length)
-			{
-				bool overlap = false;
-				vector<weldinfo>::iterator overlap_count;
-				for(vector<weldinfo>::iterator it = additional_weld.begin();it!=additional_weld.end();it++)
-				{
-					weldinfo temp_weld = *it;
-					if(check_same_point(weld_endpoint_r,temp_weld.point_1) || check_same_point(weld_endpoint_r,temp_weld.point_2))
-					{
-						overlap = true;
-						overlap_count = it;
-						break;
-					}
-				}
-				if(overlap)
-				{
-					weldinfo overlap_weld = *overlap_count;
-					write_string("WELD\n",pcf_stream);
-					write_end_points( overlap_weld.point_1, overlap_weld.point_2, overlap_weld.diameter_1, overlap_weld.diameter_2, pcf_stream ); 
-					sprintf( skey_string, COMP_SKEY_FMT, "WF"); 
-					write_string( skey_string, pcf_stream );
-					sprintf( category_string, "    CATEGORY %s\n", "ERECTION"); 
-					write_string( category_string, pcf_stream );
-					additional_weld.erase(overlap_count);
-				}else
-				{
-					write_string("WELD\n",pcf_stream);
-					write_end_points( weld_endpoint_r, weld_endpoint_r, diameter, diameter, pcf_stream ); 
-					sprintf( skey_string, COMP_SKEY_FMT, "WF"); 
-					write_string( skey_string, pcf_stream );
-					sprintf( category_string, "    CATEGORY %s\n", "ERECTION"); 
-					write_string( category_string, pcf_stream );
-				}
-			}
 
-			if(tack_weld && extra_length){
-				bool overlap = false;
-				vector<weldinfo>::iterator overlap_count;
-				for(vector<weldinfo>::iterator it = additional_weld.begin();it!=additional_weld.end();it++)
+				bool tack_weld = false;
+				bool extra_length = false;
+				for(int k = 0; k < title.size() ; k++)
 				{
-					weldinfo temp_weld = *it;
-					if(check_same_point(weld_endpoint_r,temp_weld.point_1) || check_same_point(weld_endpoint_r,temp_weld.point_2))
+					char *title_str = new char[strlen(title[k].GetLocaleText())+1];
+					strcpy(title_str, title[k].GetLocaleText());
+					if(strstr(title_str,"TACK WELD")!= NULL)
 					{
-						overlap = true;
-						overlap_count = it;
-						break;
+						tack_weld = true;
+					}
+					if(strstr(title_str,"EXTRA LENGTH")!=NULL)
+					{
+						extra_length = true;
 					}
 				}
-				if(overlap)
+		
+				if(!tack_weld && extra_length)
 				{
-					weldinfo overlap_weld = *overlap_count;
-					write_string("WELD\n",pcf_stream);
-					write_end_points( overlap_weld.point_1, overlap_weld.point_2, overlap_weld.diameter_1, overlap_weld.diameter_2, pcf_stream ); 
-					sprintf( skey_string, COMP_SKEY_FMT, "WFT"); 
-					write_string( skey_string, pcf_stream );
-					sprintf( category_string, "    CATEGORY %s\n", "ERECTION"); 
-					write_string( category_string, pcf_stream );
-					additional_weld.erase(overlap_count);
-				}else
-				{
-					write_string("WELD\n",pcf_stream);
-					write_end_points( weld_endpoint_r, weld_endpoint_r, diameter, diameter, pcf_stream ); 
-					sprintf( skey_string, COMP_SKEY_FMT, "WFT"); 
-					write_string( skey_string, pcf_stream );
-					sprintf( category_string, "    CATEGORY %s\n", "ERECTION"); 
-					write_string( category_string, pcf_stream );
+					bool overlap = false;
+					vector<weldinfo>::iterator overlap_count;
+					for(vector<weldinfo>::iterator it = additional_weld.begin();it!=additional_weld.end();it++)
+					{
+						weldinfo temp_weld = *it;
+						if(check_same_point(weld_endpoint_r,temp_weld.point_1) || check_same_point(weld_endpoint_r,temp_weld.point_2))
+						{
+							overlap = true;
+							overlap_count = it;
+							break;
+						}
+					}
+					if(overlap)
+					{
+						weldinfo overlap_weld = *overlap_count;
+						write_string("WELD\n",pcf_stream);
+						write_end_points( overlap_weld.point_1, overlap_weld.point_2, overlap_weld.diameter_1, overlap_weld.diameter_2, pcf_stream ); 
+						sprintf( skey_string, COMP_SKEY_FMT, "WF"); 
+						write_string( skey_string, pcf_stream );
+						sprintf( category_string, "    CATEGORY %s\n", "ERECTION"); 
+						write_string( category_string, pcf_stream );
+						additional_weld.erase(overlap_count);
+					}else
+					{
+						write_string("WELD\n",pcf_stream);
+						write_end_points( weld_endpoint_r, weld_endpoint_r, diameter, diameter, pcf_stream ); 
+						sprintf( skey_string, COMP_SKEY_FMT, "WF"); 
+						write_string( skey_string, pcf_stream );
+						sprintf( category_string, "    CATEGORY %s\n", "ERECTION"); 
+						write_string( category_string, pcf_stream );
+					}
 				}
-			}
+
+				if(tack_weld && extra_length){
+					bool overlap = false;
+					vector<weldinfo>::iterator overlap_count;
+					for(vector<weldinfo>::iterator it = additional_weld.begin();it!=additional_weld.end();it++)
+					{
+						weldinfo temp_weld = *it;
+						if(check_same_point(weld_endpoint_r,temp_weld.point_1) || check_same_point(weld_endpoint_r,temp_weld.point_2))
+						{
+							overlap = true;
+							overlap_count = it;
+							break;
+						}
+					}
+					if(overlap)
+					{
+						weldinfo overlap_weld = *overlap_count;
+						write_string("WELD\n",pcf_stream);
+						write_end_points( overlap_weld.point_1, overlap_weld.point_2, overlap_weld.diameter_1, overlap_weld.diameter_2, pcf_stream ); 
+						sprintf( skey_string, COMP_SKEY_FMT, "WFT"); 
+						write_string( skey_string, pcf_stream );
+						sprintf( category_string, "    CATEGORY %s\n", "ERECTION"); 
+						write_string( category_string, pcf_stream );
+						additional_weld.erase(overlap_count);
+					}else
+					{
+						write_string("WELD\n",pcf_stream);
+						write_end_points( weld_endpoint_r, weld_endpoint_r, diameter, diameter, pcf_stream ); 
+						sprintf( skey_string, COMP_SKEY_FMT, "WFT"); 
+						write_string( skey_string, pcf_stream );
+						sprintf( category_string, "    CATEGORY %s\n", "ERECTION"); 
+						write_string( category_string, pcf_stream );
+					}
+				}
 			
-			if(tack_weld && !extra_length){
-				bool overlap = false;
-				vector<weldinfo>::iterator overlap_count;
-				for(vector<weldinfo>::iterator it = additional_weld.begin();it!=additional_weld.end();it++)
-				{
-					weldinfo temp_weld = *it;
-					if(check_same_point(weld_endpoint_r,temp_weld.point_1) || check_same_point(weld_endpoint_r,temp_weld.point_2))
+				if(tack_weld && !extra_length){
+					bool overlap = false;
+					vector<weldinfo>::iterator overlap_count;
+					for(vector<weldinfo>::iterator it = additional_weld.begin();it!=additional_weld.end();it++)
 					{
-						overlap = true;
-						overlap_count = it;
-						break;
+						weldinfo temp_weld = *it;
+						if(check_same_point(weld_endpoint_r,temp_weld.point_1) || check_same_point(weld_endpoint_r,temp_weld.point_2))
+						{
+							overlap = true;
+							overlap_count = it;
+							break;
+						}
 					}
-				}
-				if(overlap)
-				{
-					weldinfo overlap_weld = *overlap_count;
-					write_string("WELD\n",pcf_stream);
-					write_end_points( overlap_weld.point_1, overlap_weld.point_2, overlap_weld.diameter_1, overlap_weld.diameter_2, pcf_stream ); 
-					sprintf( skey_string, COMP_SKEY_FMT, "WST"); 
-					write_string( skey_string, pcf_stream );
-					sprintf( category_string, "    CATEGORY %s\n", "ERECTION"); 
-					write_string( category_string, pcf_stream );
-					additional_weld.erase(overlap_count);
-				}else
-				{
-					write_string("WELD\n",pcf_stream);
-					write_end_points( weld_endpoint_r, weld_endpoint_r, diameter, diameter, pcf_stream ); 
-					sprintf( skey_string, COMP_SKEY_FMT, "WST"); 
-					write_string( skey_string, pcf_stream );
-					sprintf( category_string, "    CATEGORY %s\n", "ERECTION"); 
-					write_string( category_string, pcf_stream );
+					if(overlap)
+					{
+						weldinfo overlap_weld = *overlap_count;
+						write_string("WELD\n",pcf_stream);
+						write_end_points( overlap_weld.point_1, overlap_weld.point_2, overlap_weld.diameter_1, overlap_weld.diameter_2, pcf_stream ); 
+						sprintf( skey_string, COMP_SKEY_FMT, "WST"); 
+						write_string( skey_string, pcf_stream );
+						sprintf( category_string, "    CATEGORY %s\n", "ERECTION"); 
+						write_string( category_string, pcf_stream );
+						additional_weld.erase(overlap_count);
+					}else
+					{
+						write_string("WELD\n",pcf_stream);
+						write_end_points( weld_endpoint_r, weld_endpoint_r, diameter, diameter, pcf_stream ); 
+						sprintf( skey_string, COMP_SKEY_FMT, "WST"); 
+						write_string( skey_string, pcf_stream );
+						sprintf( category_string, "    CATEGORY %s\n", "ERECTION"); 
+						write_string( category_string, pcf_stream );
+					}
 				}
 			}
 
@@ -3021,9 +2966,9 @@ int pcf_generation::write_component_id( int charx_count,
 		   strcat( string, "\n" );
 		   status = write_string( string, pcf_stream );
 	   }else{
-		   strcpy( string, MISC_COMP_ID );
-		   strcat( string, "\n" );
-		   status = write_string( string, pcf_stream );
+		   //strcpy( string, MISC_COMP_ID );
+		   //strcat( string, "\n" );
+		   //status = write_string( string, pcf_stream );
 	   }
    }
    else
@@ -4535,37 +4480,38 @@ int pcf_generation::write_end_and_branch_points(tag_t part_tag,
 				int char_status  = 0, char_index = 0;
 				UF_ROUTE_charx_p_t port_charx_list = NULL;
 
-				if (charx_list[title_index].value.s_value != NULL && 
-					!strcmp ( charx_list[title_index].value.s_value, "FLANGE" ) )
-				{
-					/* find the flange connection and use it as end point 2 */
+				//if (charx_list[title_index].value.s_value != NULL && 
+				//	!strcmp ( charx_list[title_index].value.s_value, "FLANGE" ) )
+				//{
+				//	/* find the flange connection and use it as end point 2 */
 
-					char_status = UF_ROUTE_ask_characteristics ( port_tags[0], 
-															UF_ROUTE_CHARX_TYPE_ANY,
-															&port_charx_count, 
-															&port_charx_list );
+				//	char_status = UF_ROUTE_ask_characteristics ( port_tags[0], 
+				//											UF_ROUTE_CHARX_TYPE_ANY,
+				//											&port_charx_count, 
+				//											&port_charx_list );
 
-					if ( port_charx_count && !char_status )
-					{
-						char_status = UF_ROUTE_find_title_in_charx ( port_charx_count, 
-													port_charx_list,
-													"CONNECTION_TYPE",
-													&char_index );
+				//	if ( port_charx_count && !char_status )
+				//	{
+				//		char_status = UF_ROUTE_find_title_in_charx ( port_charx_count, 
+				//									port_charx_list,
+				//									"CONNECTION_TYPE",
+				//									&char_index );
 
-						if ( !char_status && 
-							port_charx_list[char_index].value.s_value != NULL &&
-							strcmp ( port_charx_list[char_index].value.s_value, "FLANGE" ) )
-						{
-							/* this should be the end port, butt weld, slip on or lap
-							joint port */
-							end_port = port_tags[0];
-							start_port = port_tags[1];
-						}
-						UF_ROUTE_free_charx_array ( port_charx_count, port_charx_list );                                    
-					}
+				//		if ( !char_status && 
+				//			port_charx_list[char_index].value.s_value != NULL &&
+				//			strcmp ( port_charx_list[char_index].value.s_value, "FLANGE" ) )
+				//		{
+				//			/* this should be the end port, butt weld, slip on or lap
+				//			joint port */
+				//			end_port = port_tags[0];
+				//			start_port = port_tags[1];
+				//		}
+				//		UF_ROUTE_free_charx_array ( port_charx_count, port_charx_list );                                    
+				//	}
 
-				}
-				else if ( charx_list[title_index].value.s_value != NULL &&
+				//}
+				//else 
+				if ( charx_list[title_index].value.s_value != NULL &&
 						!strcmp ( charx_list[title_index].value.s_value, "REDUCER-CONCENTRIC") ||
 						!strcmp ( charx_list[title_index].value.s_value, "REDUCER-ECCENTRIC")    )
 				{
@@ -5248,3 +5194,110 @@ void pcf_generation::write_flange_blind_point(tag_t part_tag, tag_t comp_tag, FI
 	UF_free( ports );
 }
 
+void pcf_generation::write_flange_point(tag_t part_tag, tag_t comp_tag, FILE * pcf_stream )
+{
+	int     num_ports   = 0;
+    int     status      = 0;
+    double  endpoint_1[3]   = {0.0, 0.0, 0.0};
+    double  endpoint_2[3]   = {0.0, 0.0, 0.0};
+	double  endpoint_1_abs[3]   = {0.0, 0.0, 0.0};
+    double  endpoint_2_abs[3]   = {0.0, 0.0, 0.0};
+	double  vector1[3] = {0.0, 0.0, 0.0};
+	double  vector2[3] = {0.0, 0.0, 0.0};
+	double  vector3[3] = {0.0, 0.0, 0.0};
+	double  length = 0.0;
+	double  indiameter = 0.0;
+	double  outdiameter = 0.0;
+	double  point_1[3]   = {0.0, 0.0, 0.0};
+    double  point_2[3]   = {0.0, 0.0, 0.0};
+	double  point_3[3]   = {0.0, 0.0, 0.0};
+	double	distance_1 = 0.0;
+	double	distance_2 = 0.0;
+	double	distance_3 = 0.0;
+	double	dot = 0.0;
+	char message[ MAX_LINE_BUFSIZE ]="";
+    tag_t   *ports      = NULL;
+	tag_t	*anchor_tags = NULL;
+    char    pcf_string[ MAX_LINE_BUFSIZE ] = "";
+	UF_ATTR_info_t info;
+	UF_ATTR_info_t member_name;
+	logical has_attr = false;
+	logical has_mem = false;
+
+    status = UF_ROUTE_ask_object_port (comp_tag, &num_ports, &ports);
+	CHECK_STATUS
+
+	status =  UF_ATTR_get_user_attribute_with_title_and_type(comp_tag, "FLG_THK", UF_ATTR_real, UF_ATTR_NOT_ARRAY, &info, &has_attr);
+	status =  UF_ATTR_get_user_attribute_with_title_and_type(comp_tag, "MEMBER_NAME", UF_ATTR_string, UF_ATTR_NOT_ARRAY, &member_name, &has_mem);
+	CHECK_STATUS
+	
+	char *X06FB = strstr(member_name.string_value, "X06FB");
+	
+	if(X06FB != NULL)
+	{
+		status = UF_ROUTE_ask_port_position( ports[0], endpoint_1_abs );
+		status = UF_ROUTE_ask_port_position( ports[0], endpoint_2_abs );
+	}else
+	{
+
+		switch (num_ports)
+		{
+			case 1:
+				status = UF_ROUTE_ask_port_position( ports[0], endpoint_1_abs );
+				CHECK_STATUS   
+				UF_ROUTE_ask_port_align_vector(ports[0], vector1);
+				if(has_attr)
+				{
+					length = info.real_value;
+				}
+				endpoint_2_abs[0] = endpoint_1_abs[0] - length * vector1[0] / sqrt(vector1[0] * vector1[0] + vector1[1] * vector1[1] + vector1[2] * vector1[2]);
+				endpoint_2_abs[1] = endpoint_1_abs[1] - length * vector1[1] / sqrt(vector1[0] * vector1[0] + vector1[1] * vector1[1] + vector1[2] * vector1[2]);
+				endpoint_2_abs[2] = endpoint_1_abs[2] - length * vector1[2] / sqrt(vector1[0] * vector1[0] + vector1[1] * vector1[1] + vector1[2] * vector1[2]);
+				break;
+			case 2:
+				status = UF_ROUTE_ask_port_position( ports[0], endpoint_1_abs); 
+				CHECK_STATUS
+				status = UF_ROUTE_ask_port_position( ports[1], endpoint_2_abs);
+				CHECK_STATUS
+				break;
+			case 3:
+				status = UF_ROUTE_ask_port_position( ports[0], point_1 );
+				status = UF_ROUTE_ask_port_position( ports[1], point_2 );
+				status = UF_ROUTE_ask_port_position( ports[2], point_3 );
+				distance_1 = line_length(point_1, point_2);
+				distance_2 = line_length(point_1, point_3);
+				distance_3 = line_length(point_2, point_3);
+				if(distance_1 > distance_2 && distance_1 > distance_3)
+				{
+					UF_ROUTE_ask_port_position(ports[0], endpoint_1_abs);
+					UF_ROUTE_ask_port_position(ports[1], endpoint_2_abs);
+				}
+				if(distance_2 > distance_1 && distance_2 > distance_3)
+				{
+					UF_ROUTE_ask_port_position(ports[0], endpoint_1_abs);
+					UF_ROUTE_ask_port_position(ports[2], endpoint_2_abs);
+				}
+				if(distance_3 > distance_1 && distance_3 > distance_2)
+				{
+					UF_ROUTE_ask_port_position(ports[1], endpoint_1_abs);
+					UF_ROUTE_ask_port_position(ports[2], endpoint_2_abs);
+				}
+			default:
+				sprintf( message, "Invalid number of ports for component %u\n", comp_tag );
+				UF_print_syslog( message, FALSE );
+				status = UF_err_operation_aborted;
+				break;
+		}
+	}
+
+	coordinate_transform(endpoint_1_abs, endpoint_1);
+	coordinate_transform(endpoint_2_abs, endpoint_2);
+
+	indiameter  = determine_in_diameter  ( comp_tag );
+    outdiameter = determine_out_diameter ( comp_tag, indiameter );
+
+	write_end_points( endpoint_1, endpoint_2, indiameter, outdiameter, pcf_stream );
+
+	UF_ATTR_free_user_attribute_info_strings(&info);
+	UF_free( ports );
+}

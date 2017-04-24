@@ -13,6 +13,7 @@
 //------------------------------------------------------------------------------
 //These includes are needed for the following template code
 //------------------------------------------------------------------------------
+
 #include <iostream>
 #include <NXOpen/UI.hxx>
 #include <NXOpen/NXMessageBox.hxx>
@@ -23,15 +24,18 @@
 #include <NXOpen/BlockStyler_PropertyList.hxx>
 #include <NXOpen/BlockStyler_Group.hxx>
 #include <NXOpen/BlockStyler_Button.hxx>
-
 #include "ufd_route_pcf_generation.hpp"
+
+#include <windows.h>
+#undef CreateDialog
+
 
 //------------------------------------------------------------------------------
 // Namespaces needed for following template
 //------------------------------------------------------------------------------
-using namespace std;
 using namespace NXOpen;
 using namespace NXOpen::BlockStyler;
+using namespace std;
 
 class DllExport pcf_tool
 {
@@ -56,6 +60,7 @@ public:
     int ok_cb();
     int update_cb(NXOpen::BlockStyler::UIBlock* block);
 	void Splite(string input_str, char* symbol, vector<string>& output_str);
+	void TcharToChar(const TCHAR * tchar, char * _char);
     PropertyList* GetBlockProperties(const char *blockID);
     
 private:

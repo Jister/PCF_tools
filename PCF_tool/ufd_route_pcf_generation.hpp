@@ -64,6 +64,8 @@
 #include <NXOpen/Routing_RouteManager.hxx>
 #include <NXOpen/Routing_Stock.hxx>
 #include <NXOpen/Routing_StockCollection.hxx>
+
+
 /*
 ** PCF string formats
 */
@@ -124,7 +126,6 @@
 #define TUBE_ID					 "TUBE"
 #define TEE_SET_ON_ID            "TEE-SET-ON"
 
-using namespace std;
 using namespace NXOpen;
 
 class pcf_generation
@@ -175,6 +176,7 @@ public:
 	void write_olet_center_and_branch_points ( tag_t comp_tag, FILE * pcf_stream );
 	void write_stub_end_point(tag_t comp_tag, FILE * pcf_stream );
 	void write_flange_blind_point(tag_t part_tag, tag_t comp_tag, FILE * pcf_stream );
+	void write_flange_point(tag_t part_tag, tag_t comp_tag, FILE * pcf_stream );
 	void write_support_coords ( tag_t part_tag, tag_t comp_tag, FILE * pcf_stream );
 	void get_lateral_butt_weld_center_point ( double pnt1[3], double pnt2[3], double vec1[3], double vec2[3], double butt_center[3] );
 	void adjust_end_pts_for_tee_set_on ( tag_t  end_rcps[2], double end_pt1[3], double end_pt2[3] );

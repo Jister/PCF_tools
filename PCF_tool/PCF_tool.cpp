@@ -9,8 +9,12 @@
 
 //------------------------------------------------------------------------------
 //These includes are needed for the following template code
-//------------------------------------------------------------------------------
+//------------------------------------------------------------------------------ 
+
 #include "pcf_tool.hpp"
+
+
+using namespace std;
 using namespace NXOpen;
 using namespace NXOpen::BlockStyler;
 
@@ -31,7 +35,19 @@ pcf_tool::pcf_tool()
         pcf_tool::theUI = UI::GetUI();
 		workPart = theSession->Parts()->Work();
 		displayPart = theSession->Parts()->Display();
-        theDlxFileName = "pcf_tool.dlx";
+
+		TCHAR path[MAX_PATH];
+		char path_name[250];
+		char dlx_name[250];
+		GetModuleFileName(GetModuleHandle(TEXT("PCF_tool.dll")),path,MAX_PATH);
+		TcharToChar(path,path_name);
+		vector<string> splite_string;
+		string temp = path_name;
+		Splite(temp, ".", splite_string);
+		strcpy(dlx_name, splite_string[0].c_str());
+		strcat(dlx_name, ".dlx");
+
+        theDlxFileName = dlx_name;
         theDialog = pcf_tool::theUI->CreateDialog(theDlxFileName);
         // Registration of callback functions
         theDialog->AddApplyHandler(make_callback(this, &pcf_tool::apply_cb));
@@ -467,6 +483,14 @@ void pcf_tool::Splite(string input_str, char* symbol, vector<string>& output_str
 	return;
 }
 
+void pcf_tool::TcharToChar(const TCHAR * tchar, char * _char)
+{
+    int iLength;
+    //获取字节长度   
+    iLength = WideCharToMultiByte(CP_ACP, 0, tchar, -1, NULL, 0, NULL, NULL);
+    //将tchar值赋给_char    
+    WideCharToMultiByte(CP_ACP, 0, tchar, -1, _char, iLength, NULL, NULL);
+}
 //------------------------------------------------------------------------------
 //Function Name: GetBlockProperties
 //Description: Returns the propertylist of the specified BlockID
