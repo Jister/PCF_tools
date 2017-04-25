@@ -2291,6 +2291,7 @@ int pcf_generation::build_components( tag_t part_tag,
                  int err_code = 0;
                  double center_pnt_abs[3];
 				 double center_pnt[3];
+				 double bend_radius = 0.0;
                  char *pcf_string = NULL;
 
                  UF_ROUTE_ask_rcp_position ( cnr_rcp, center_pnt_abs);
@@ -2303,18 +2304,20 @@ int pcf_generation::build_components( tag_t part_tag,
                            center_pnt[0], center_pnt[1], center_pnt[2]);
 
                  status = write_string( pcf_string, pcf_stream );
+                 UF_free ( pcf_string );
 
+				 //write bend radius
+				 bend_radius = line_length(center_pnt, end_pt1);
+				 pcf_string = (char *) UF_allocate_memory( MAX_LINE_BUFSIZE, &err_code );
+				 sprintf ( pcf_string, "    BEND-RADIUS %.4f\n", bend_radius);
+				 status = write_string( pcf_string, pcf_stream );
                  UF_free ( pcf_string );
 
                  /* Bend needs skey. We assume plain end connection, see pcf documentation
                     for furter information */
-                 pcf_string = (char *) UF_allocate_memory( MAX_LINE_BUFSIZE,
-                                                           &err_code );
-
+                 pcf_string = (char *) UF_allocate_memory( MAX_LINE_BUFSIZE,  &err_code );
                  sprintf ( pcf_string, COMP_SKEY_FMT, BEND_PIPE_SKEY );
-
                  status = write_string( pcf_string, pcf_stream );
-
                  UF_free ( pcf_string );
 
              }
@@ -2353,17 +2356,20 @@ int pcf_generation::build_components( tag_t part_tag,
       }
    }
 
-
-	/*char message3[100];
-	sprintf(message3,"\n\npipe number:%d\nbend number:%d\n",pipe_count-bend_count,bend_count);
-	UF_UI_write_listing_window(message3);
-	UF_MODL_delete_list(&lpObj);*/
-
-
    /*
    ** Get all of the components and build/write a PCF entry for each valid component.
    ** Components that are not defined for ISOGEN are assigned a MISC_COMP components.
    */
+
+   //find stubend endpoint at beginning
+	for(int it_comp = 0; it_comp < components.size(); it_comp++)
+	{
+		if( strcmp(components[it_comp]->GetStringAttribute("ISOGEN_COMPONENT_ID").GetLocaleText(), "LAPJOINT-STUBEND" ) == 0 
+			|| strcmp(components[it_comp]->GetStringAttribute("ISOGEN_COMPONENT_ID").GetLocaleText(), "LAPJOINT-STUB-END" ) == 0 )
+		{
+			get_stub_end_point(components[it_comp]->Tag());
+		}
+	}
 
 	for(int it_comp = 0; it_comp < components.size(); it_comp++)
 	{
@@ -4950,6 +4956,157 @@ void pcf_generation::getComponents(std::vector<Assemblies::Component*>& componen
 	}
 }
 
+void pcf_generation::get_stub_end_point(tag_t comp_tag)
+{
+    int     num_ports   = 0;
+    int     status      = 0;
+    double  endpoint_1[3]   = {0.0, 0.0, 0.0};
+    double  endpoint_2[3]   = {0.0, 0.0, 0.0};
+	double  endpoint_1_abs[3]   = {0.0, 0.0, 0.0};
+    double  endpoint_2_abs[3]   = {0.0, 0.0, 0.0};
+	double  vector1[3] = {0.0, 0.0, 0.0};
+	double  vector2[3] = {0.0, 0.0, 0.0};
+	double  vector3[3] = {0.0, 0.0, 0.0};
+	double  length = 0.0;
+	double  indiameter = 0.0;
+	double  outdiameter = 0.0;
+	double  point_1[3]   = {0.0, 0.0, 0.0};
+    double  point_2[3]   = {0.0, 0.0, 0.0};
+	double  point_3[3]   = {0.0, 0.0, 0.0};
+	double	distance_1 = 0.0;
+	double	distance_2 = 0.0;
+	double	distance_3 = 0.0;
+	double	dot = 0.0;
+	char message[ MAX_LINE_BUFSIZE ]="";
+    tag_t   *ports      = NULL;
+    char    pcf_string[ MAX_LINE_BUFSIZE ] = "";
+	UF_ATTR_info_t info;
+	logical has_attr = false;
+
+	UF_ATTR_info_t name_info;
+	logical has_name_attr = false;
+	logical is_X0002 = false;
+
+	UF_ATTR_get_user_attribute_with_title_and_type(comp_tag, "MEMBER_NAME", UF_ATTR_any , UF_ATTR_NOT_ARRAY, &name_info, &has_name_attr);
+	if(has_name_attr)
+	{
+		if(strstr(name_info.string_value, "X0002") != NULL)
+		{
+			is_X0002 = true;
+		}
+	}
+	UF_ATTR_free_user_attribute_info_strings(&name_info);
+
+    status = UF_ROUTE_ask_object_port (comp_tag, &num_ports, &ports);
+	CHECK_STATUS
+	status =  UF_ATTR_get_user_attribute_with_title_and_type(comp_tag, "STUB_LEN", UF_ATTR_real, UF_ATTR_NOT_ARRAY, &info, &has_attr);
+	CHECK_STATUS
+	if(has_attr)
+	{
+		length = info.real_value;
+	}
+
+	switch (num_ports)
+	{
+		case 1:
+			status = UF_ROUTE_ask_port_position( ports[0], endpoint_1_abs );
+			CHECK_STATUS   
+			UF_ROUTE_ask_port_align_vector(ports[0], vector1);
+			
+			endpoint_2_abs[0] = endpoint_1_abs[0] - length * vector1[0] / sqrt(vector1[0] * vector1[0] + vector1[1] * vector1[1] + vector1[2] * vector1[2]);
+			endpoint_2_abs[1] = endpoint_1_abs[1] - length * vector1[1] / sqrt(vector1[0] * vector1[0] + vector1[1] * vector1[1] + vector1[2] * vector1[2]);
+			endpoint_2_abs[2] = endpoint_1_abs[2] - length * vector1[2] / sqrt(vector1[0] * vector1[0] + vector1[1] * vector1[1] + vector1[2] * vector1[2]);
+			break;
+		case 2:
+			status = UF_ROUTE_ask_port_position( ports[0], endpoint_1_abs); 
+			CHECK_STATUS
+			status = UF_ROUTE_ask_port_position( ports[1], endpoint_2_abs);
+			CHECK_STATUS
+			break;
+		case 3:
+			if(has_attr)
+			{
+				UF_ROUTE_ask_port_align_vector(ports[0], vector1);
+				UF_ROUTE_ask_port_align_vector(ports[1], vector2);
+				UF_ROUTE_ask_port_align_vector(ports[2], vector3);
+				UF_VEC3_dot ( vector1, vector2, &dot );
+				if ( dot > 0 )
+				{
+					UF_ROUTE_ask_port_position(ports[2], endpoint_1_abs);
+					endpoint_2_abs[0] = endpoint_1_abs[0] - length * vector3[0] / sqrt(vector3[0] * vector3[0] + vector3[1] * vector3[1] + vector3[2] * vector3[2]);
+					endpoint_2_abs[1] = endpoint_1_abs[1] - length * vector3[1] / sqrt(vector3[0] * vector3[0] + vector3[1] * vector3[1] + vector3[2] * vector3[2]);
+					endpoint_2_abs[2] = endpoint_1_abs[2] - length * vector3[2] / sqrt(vector3[0] * vector3[0] + vector3[1] * vector3[1] + vector3[2] * vector3[2]);
+				}
+				else
+				{
+					UF_VEC3_dot ( vector1, vector3, &dot );
+					if ( dot > 0 ) 
+					{
+						UF_ROUTE_ask_port_position(ports[1], endpoint_1_abs);
+						endpoint_2_abs[0] = endpoint_1_abs[0] - length * vector2[0] / sqrt(vector2[0] * vector2[0] + vector2[1] * vector2[1] + vector2[2] * vector2[2]);
+						endpoint_2_abs[1] = endpoint_1_abs[1] - length * vector2[1] / sqrt(vector2[0] * vector2[0] + vector2[1] * vector2[1] + vector2[2] * vector2[2]);
+						endpoint_2_abs[2] = endpoint_1_abs[2] - length * vector2[2] / sqrt(vector2[0] * vector2[0] + vector2[1] * vector2[1] + vector2[2] * vector2[2]);
+					}
+					else 
+					{
+						UF_ROUTE_ask_port_position(ports[0], endpoint_1_abs);
+						endpoint_2_abs[0] = endpoint_1_abs[0] - length * vector1[0] / sqrt(vector1[0] * vector1[0] + vector1[1] * vector1[1] + vector1[2] * vector1[2]);
+						endpoint_2_abs[1] = endpoint_1_abs[1] - length * vector1[1] / sqrt(vector1[0] * vector1[0] + vector1[1] * vector1[1] + vector1[2] * vector1[2]);
+						endpoint_2_abs[2] = endpoint_1_abs[2] - length * vector1[2] / sqrt(vector1[0] * vector1[0] + vector1[1] * vector1[1] + vector1[2] * vector1[2]);	
+					}
+				}
+			}else
+			{
+				status = UF_ROUTE_ask_port_position( ports[0], point_1 );
+				status = UF_ROUTE_ask_port_position( ports[1], point_2 );
+				status = UF_ROUTE_ask_port_position( ports[2], point_3 );
+				distance_1 = line_length(point_1, point_2);
+				distance_2 = line_length(point_1, point_3);
+				distance_3 = line_length(point_2, point_3);
+				if(distance_1 > distance_2 && distance_1 > distance_3)
+				{
+					UF_ROUTE_ask_port_position(ports[0], endpoint_1_abs);
+					UF_ROUTE_ask_port_position(ports[1], endpoint_2_abs);
+				}
+				if(distance_2 > distance_1 && distance_2 > distance_3)
+				{
+					UF_ROUTE_ask_port_position(ports[0], endpoint_1_abs);
+					UF_ROUTE_ask_port_position(ports[2], endpoint_2_abs);
+				}
+				if(distance_3 > distance_1 && distance_3 > distance_2)
+				{
+					UF_ROUTE_ask_port_position(ports[1], endpoint_1_abs);
+					UF_ROUTE_ask_port_position(ports[2], endpoint_2_abs);
+				}
+			}
+			break;
+		default:
+			sprintf( message, "Invalid number of ports for component %u\n", comp_tag );
+			UF_print_syslog( message, FALSE );
+			status = UF_err_operation_aborted;
+			break;
+	}
+	coordinate_transform(endpoint_1_abs, endpoint_1);
+	coordinate_transform(endpoint_2_abs, endpoint_2);
+
+	indiameter  = determine_in_diameter  ( comp_tag );
+    outdiameter = determine_out_diameter ( comp_tag, indiameter );
+
+	pointinfo stubend_endpoint;
+	stubend_endpoint.end_point[0] = endpoint_1[0];
+	stubend_endpoint.end_point[1] = endpoint_1[1];
+	stubend_endpoint.end_point[2] = endpoint_1[2];
+	stubend_endpoint.diameter = indiameter;
+	stubend_point.push_back(stubend_endpoint);
+	stubend_endpoint.end_point[0] = endpoint_2[0];
+	stubend_endpoint.end_point[1] = endpoint_2[1];
+	stubend_endpoint.end_point[2] = endpoint_2[2];
+	stubend_endpoint.diameter = outdiameter;
+	stubend_point.push_back(stubend_endpoint);
+
+	UF_ATTR_free_user_attribute_info_strings(&info);
+	UF_free( ports );
+}
 void pcf_generation::write_stub_end_point(tag_t comp_tag, FILE * pcf_stream )
 {
     int     num_ports   = 0;
@@ -5087,6 +5244,7 @@ void pcf_generation::write_stub_end_point(tag_t comp_tag, FILE * pcf_stream )
     outdiameter = determine_out_diameter ( comp_tag, indiameter );
 
 	write_end_points( endpoint_1, endpoint_2, indiameter, outdiameter, pcf_stream );
+
 	if(is_X0002)
 	{
 		pointinfo point_temp;
@@ -5292,6 +5450,34 @@ void pcf_generation::write_flange_point(tag_t part_tag, tag_t comp_tag, FILE * p
 
 	coordinate_transform(endpoint_1_abs, endpoint_1);
 	coordinate_transform(endpoint_2_abs, endpoint_2);
+
+	if(X06FB != NULL)
+	{
+		int pos;
+		double dist;
+		for(int i = 0; i < stubend_point.size(); i ++)
+		{
+			if(i == 0)
+			{
+				pos = i;
+				dist = line_length(endpoint_1,stubend_point[i].end_point);
+			}
+			if(line_length(endpoint_1,stubend_point[i].end_point) < dist)
+			{
+				pos = i;
+				dist = line_length(endpoint_1,stubend_point[i].end_point);
+			}
+		}	
+		if(stubend_point.size() > 0)
+		{
+			endpoint_1[0] =  stubend_point[pos].end_point[0];
+			endpoint_1[1] =  stubend_point[pos].end_point[1];
+			endpoint_1[2] =  stubend_point[pos].end_point[2];
+			endpoint_2[0] =  stubend_point[pos].end_point[0];
+			endpoint_2[1] =  stubend_point[pos].end_point[1];
+			endpoint_2[2] =  stubend_point[pos].end_point[2];
+		}
+	}
 
 	indiameter  = determine_in_diameter  ( comp_tag );
     outdiameter = determine_out_diameter ( comp_tag, indiameter );

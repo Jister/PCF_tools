@@ -175,6 +175,7 @@ public:
 	void copy_position(double input_pos[3], double output_pos[3]);
 	void write_olet_center_and_branch_points ( tag_t comp_tag, FILE * pcf_stream );
 	void write_stub_end_point(tag_t comp_tag, FILE * pcf_stream );
+	void get_stub_end_point(tag_t comp_tag);
 	void write_flange_blind_point(tag_t part_tag, tag_t comp_tag, FILE * pcf_stream );
 	void write_flange_point(tag_t part_tag, tag_t comp_tag, FILE * pcf_stream );
 	void write_support_coords ( tag_t part_tag, tag_t comp_tag, FILE * pcf_stream );
@@ -207,6 +208,7 @@ public:
 
 private:
 	std::vector<pointinfo> control_point;
+	std::vector<pointinfo> stubend_point;
 	std::vector<weldinfo> additional_weld;
 	Part *workPart;
 	Part *displayPart;
