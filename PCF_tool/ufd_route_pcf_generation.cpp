@@ -2122,9 +2122,6 @@ int pcf_generation::build_components( tag_t part_tag,
    int num_rcps = 0;
    tag_t *rcps = NULL;
    
-   int num_stocks = 0;
-   tag_t * stocks = NULL;
-   int i = 0;
    int n_items = 0;
 
    char **item_code_char = NULL;
@@ -2156,7 +2153,7 @@ int pcf_generation::build_components( tag_t part_tag,
 		char *title_str = new char[strlen(title[0].GetLocaleText())+1];
 		strcpy(title_str, title[0].GetLocaleText());
 
-		if(strstr(title_str, "TACK WELD") != NULL || strstr(title_str, "EXTRA LENGTH") != NULL)
+		if(strstr(title_str, "TACK WELD") != NULL || strstr(title_str, "EXTRA LENGTH") != NULL || strstr(title_str, "NO WELD") != NULL)
 		{
 			Annotations::LeaderBuilder *leader_builder =  workPart->Annotations()->CreateDraftingNoteBuilder(label)->Leader();
 			Annotations::LeaderDataList *leader_data_list = leader_builder->Leaders();
@@ -2175,48 +2172,78 @@ int pcf_generation::build_components( tag_t part_tag,
 				label_coordinate[3].push_back(0.0);
 			}
 		}
+
+		if(strstr(title_str, "CUT ELBOW") != NULL)
+		{
+			Annotations::LeaderBuilder *leader_builder =  workPart->Annotations()->CreateDraftingNoteBuilder(label)->Leader();
+			Annotations::LeaderDataList *leader_data_list = leader_builder->Leaders();
+
+			for(int i_label = 0; i_label < leader_data_list->Length(); i_label++)
+			{
+				Annotations::LeaderData *leader_data = leader_data_list->FindItem(i_label);
+				DisplayableObject *selection;
+				View *view;
+				Point3d point;
+				leader_data->Leader()->GetValue(&selection, &view, &point);
+
+				double point_abs[3];
+				double point_r[3];
+				point_abs[0] = point.X;
+				point_abs[1] = point.Y;
+				point_abs[2] = point.Z;
+				coordinate_transform(point_abs,point_r);
+
+				pointinfo point_temp;
+				point_temp.end_point[0] = point_r[0];
+				point_temp.end_point[1] = point_r[1];
+				point_temp.end_point[2] = point_r[2];
+				point_temp.diameter = 0.0;
+				cut_elbow_label.push_back(point_temp);
+				//uc1601("test",1);
+			}
+		}
 	}
 
-   status = get_stock_in_part( part_tag,
-                               &num_stocks,
-                               &stocks );
-   
-   for( i = 0; i < num_stocks; i++ )
-   {
-      logical is_interior = FALSE;
-   
-      status = UF_ROUTE_is_stock_interior( stocks[i],
-                                           &is_interior );
-      CHECK_STATUS
-      
-      /*
-      ** Don't include interior stock in the PCF
-      */
-      if( !is_interior )
-      {
-         int jj = 0;
+	NXOpen::Routing::StockCollection::iterator it_stock;
+	for(it_stock = workPart->RouteManager()->Stocks()->begin() ; it_stock != workPart->RouteManager()->Stocks()->end() ; it_stock ++ )				
+	{
+		bool has_spool_identifier = false;
+		char spool_identifier[MAX_LINE_BUFSIZE];
+		char pcf_string[MAX_LINE_BUFSIZE];
 
-         /*
+		Routing::Stock* stocks = (Routing::Stock*) *it_stock;
+		//get feature from stock
+		std::vector< NXOpen::Features::Feature * > feature = stocks->GetFeatures();		
+
+		if(feature.size()>0)
+		{
+			//get value of "TubeCallout" from feature
+						 
+			if(feature[0]->HasUserAttribute("KIT",NXOpen::NXObject::AttributeTypeString,0))
+			{
+				strcpy(spool_identifier, feature[0]->GetStringUserAttribute("KIT",0).GetLocaleText());
+				has_spool_identifier = true;
+			}else
+			{
+				has_spool_identifier = false;
+			}
+		}else
+		{
+			uc1601("Can't find the feature from stock! PCF generation uncomplete!",1);
+		}
+
+		 /*
          ** Get all of the charxs for the stock and find the charx required for
          ** the stock entry in the PCF file      
          */ 
-         status = UF_ROUTE_ask_stock_stock_data( stocks[i], &stock_data);
-         CHECK_STATUS
-         
-         status = UF_ROUTE_ask_characteristics ( stock_data,
-                                                 UF_ROUTE_CHARX_TYPE_ANY,
-                                                 &charx_count,
-                                                 &charx_list );
-         CHECK_STATUS
-         
-         status = UF_ROUTE_ask_stock_segments( stocks[i],
-                                               &num_segments,
-                                               &segments );
-         CHECK_STATUS
+		status = UF_ROUTE_ask_stock_stock_data( stocks->Tag(), &stock_data);
+        CHECK_STATUS
+        status = UF_ROUTE_ask_characteristics ( stock_data, UF_ROUTE_CHARX_TYPE_ANY, &charx_count, &charx_list );
+        CHECK_STATUS
+        status = UF_ROUTE_ask_stock_segments( stocks->Tag(), &num_segments, &segments );
+        CHECK_STATUS
 
-		 pipe_count += num_segments;
-
-         for ( jj = 0; jj < num_segments; jj++ )
+         for ( int jj = 0; jj < num_segments; jj++ )
          {
              logical is_corner = FALSE;
              int cnr_type      = 0;
@@ -2267,6 +2294,18 @@ int pcf_generation::build_components( tag_t part_tag,
              double inDiameter  = determine_in_diameter( stock_data );
              double outDiameter = determine_out_diameter( stock_data, inDiameter );
              write_end_points( end_pt1, end_pt2, inDiameter, outDiameter, pcf_stream ); 
+
+			pointinfo point_temp;
+			point_temp.end_point[0] = end_pt1[0];
+			point_temp.end_point[1] = end_pt1[1];
+			point_temp.end_point[2] = end_pt1[2];
+			point_temp.diameter = inDiameter;
+			pipe_endpoint.push_back(point_temp);
+			point_temp.end_point[0] = end_pt2[0];
+			point_temp.end_point[1] = end_pt2[1];
+			point_temp.end_point[2] = end_pt2[2];
+			point_temp.diameter = outDiameter;
+			pipe_endpoint.push_back(point_temp);
 
 			  //*******判断端点是否为weld点,是weld点，将此直径赋予该weld***************//
 			 for (int count = 0; count < label_coordinate[0].size(); count++)
@@ -2326,7 +2365,7 @@ int pcf_generation::build_components( tag_t part_tag,
              ** Write the item code for the stock and include any unique items
              ** in the material list.
              */
-             write_item_code( charx_count, charx_list, stocks[i], pcf_stream,
+			 write_item_code( charx_count, charx_list, stocks->Tag(), pcf_stream,
                               material_stream, &item_code_char, &n_items );
 
              /*
@@ -2334,27 +2373,31 @@ int pcf_generation::build_components( tag_t part_tag,
              */
              write_weight( charx_count, charx_list, pcf_stream );
 
-             /* Add COMPONENT-ATTRIBUTE1 - 9 attributes */
-             for ( int kk = 0; kk < n_pcf_comp_attrs; kk++ )
-             {
-                 apply_component_attribute( kk, stocks[i], pcf_comp_attrs[kk], pcf_stream ); 
-             }
-         }
+			 if(has_spool_identifier)
+			 {
+				 sprintf(pcf_string,"    SPOOL-IDENTIFIER  %s\n", spool_identifier);
+				 write_string(pcf_string, pcf_stream);
+			 }else
+			 {
+				 uc1601("The stock doesn't have KIT attribute!",1);
+			 }
 
-         /*
-         ** Free up the routing characteristics and prepare it for use again
-         */
-         if( charx_count > 0 )
-         {
-            status = UF_ROUTE_free_charx_array( charx_count,
-                                                charx_list );
-            CHECK_STATUS
+			 /*
+			 ** Free up the routing characteristics and prepare it for use again
+			 */
+			 if( charx_count > 0 )
+			 {
+				status = UF_ROUTE_free_charx_array( charx_count,
+													charx_list );
+				CHECK_STATUS
 
-            charx_count = 0;
-            charx_list = NULL;
+				charx_count = 0;
+				charx_list = NULL;
+			 }
          }
-      }
-   }
+				
+	}
+
 
    /*
    ** Get all of the components and build/write a PCF entry for each valid component.
@@ -2478,6 +2521,14 @@ int pcf_generation::build_components( tag_t part_tag,
           //Flange Blind
           write_flange_point(part_tag, comp_tag, pcf_stream );
       }
+	  else if ( !status &&
+          index >= 0 &&
+          charx_list[index].value.s_value != NULL &&
+          strcmp( charx_list[index].value.s_value, "ELBOW" ) == 0 )
+      {
+          //ELBOW
+          write_elbow_point(part_tag, comp_tag, pcf_stream );
+      }
       else
       {
           write_end_and_branch_points( part_tag, comp_tag, pcf_stream );
@@ -2515,17 +2566,7 @@ int pcf_generation::build_components( tag_t part_tag,
             write_center_point( part_tag, comp_tag, charx_count, charx_list, pcf_stream );
          }
             
-         /*
-         ** Elbow components require a center point and angle
-         */
-         if( strcmp( charx_list[index].value.s_value, ELBOW_COMP_ID ) == 0 )
-         {
-            write_center_point( part_tag, comp_tag, charx_count, charx_list, pcf_stream ); 
-            
-            write_angle( charx_count, charx_list, pcf_stream );
-               
-         }
-            
+        
          /*
          ** Instrument components require a center point
          */
@@ -2594,6 +2635,8 @@ int pcf_generation::build_components( tag_t part_tag,
                        material_stream, &item_code_char, &n_items );
       
       write_weight( charx_count, charx_list, pcf_stream);
+
+	  write_comp_spool_identifier(comp_tag, pcf_stream );
 
       /* Add COMPONENT-ATTRIBUTE1 - 9 attributes */
       {
@@ -2683,6 +2726,7 @@ int pcf_generation::build_components( tag_t part_tag,
 
 				bool tack_weld = false;
 				bool extra_length = false;
+				bool no_weld = false;
 				for(int k = 0; k < title.size() ; k++)
 				{
 					char *title_str = new char[strlen(title[k].GetLocaleText())+1];
@@ -2694,6 +2738,10 @@ int pcf_generation::build_components( tag_t part_tag,
 					if(strstr(title_str,"EXTRA LENGTH")!=NULL)
 					{
 						extra_length = true;
+					}
+					if(strstr(title_str,"NO WELD")!= NULL)
+					{
+						no_weld = true;
 					}
 				}
 		
@@ -2799,6 +2847,40 @@ int pcf_generation::build_components( tag_t part_tag,
 						write_string( category_string, pcf_stream );
 					}
 				}
+
+				if(no_weld){
+					bool overlap = false;
+					vector<weldinfo>::iterator overlap_count;
+					for(vector<weldinfo>::iterator it = additional_weld.begin();it!=additional_weld.end();it++)
+					{
+						weldinfo temp_weld = *it;
+						if(check_same_point(weld_endpoint_r,temp_weld.point_1) || check_same_point(weld_endpoint_r,temp_weld.point_2))
+						{
+							overlap = true;
+							overlap_count = it;
+							break;
+						}
+					}
+					if(overlap)
+					{
+						weldinfo overlap_weld = *overlap_count;
+						write_string("WELD\n",pcf_stream);
+						write_end_points( overlap_weld.point_1, overlap_weld.point_2, overlap_weld.diameter_1, overlap_weld.diameter_2, pcf_stream ); 
+						sprintf( skey_string, COMP_SKEY_FMT, "WO"); 
+						write_string( skey_string, pcf_stream );
+						sprintf( category_string, "    CATEGORY %s\n", "OFFSHORE"); 
+						write_string( category_string, pcf_stream );
+						additional_weld.erase(overlap_count);
+					}else
+					{
+						write_string("WELD\n",pcf_stream);
+						write_end_points( weld_endpoint_r, weld_endpoint_r, diameter, diameter, pcf_stream ); 
+						sprintf( skey_string, COMP_SKEY_FMT, "WO"); 
+						write_string( skey_string, pcf_stream );
+						sprintf( category_string, "    CATEGORY %s\n", "OFFSHORE"); 
+						write_string( category_string, pcf_stream );
+					}
+				}
 			}
 
 		}		
@@ -2823,90 +2905,86 @@ int pcf_generation::build_components( tag_t part_tag,
     * defined and print all the isogen information for TEE_SET_ON component 
     */
 
-    status = get_tee_set_on_components ( part_tag, &num_rcps, &rcps );
+   // status = get_tee_set_on_components ( part_tag, &num_rcps, &rcps );
 
-   for ( i = 0; i < num_rcps; i++ )
-   {
-       double tso_center[3] = {0.0, 0.0, 0.0};
-       double tso_branch[3] = {0.0, 0.0, 0.0};
-	   double tso_center_r[3] = {0.0, 0.0, 0.0};
-       double tso_branch_r[3] = {0.0, 0.0, 0.0};
+   //for ( int i = 0; i < num_rcps; i++ )
+   //{
+   //    double tso_center[3] = {0.0, 0.0, 0.0};
+   //    double tso_branch[3] = {0.0, 0.0, 0.0};
+	  // double tso_center_r[3] = {0.0, 0.0, 0.0};
+   //    double tso_branch_r[3] = {0.0, 0.0, 0.0};
 
-      status = UF_ROUTE_ask_characteristics( rcps[i], 
-                                             UF_ROUTE_CHARX_TYPE_ANY,
-                                             &charx_count, 
-                                             &charx_list);
+   //   status = UF_ROUTE_ask_characteristics( rcps[i], 
+   //                                          UF_ROUTE_CHARX_TYPE_ANY,
+   //                                          &charx_count, 
+   //                                          &charx_list);
 
-      CHECK_STATUS
+   //   CHECK_STATUS
 
-      if (status != ERROR_OK || charx_count == 0 )
-      {
-         char syslog_message[133]="";
+   //   if (status != ERROR_OK || charx_count == 0 )
+   //   {
+   //      char syslog_message[133]="";
 
-         sprintf( syslog_message, "Failed to find any characteristics rcp: %u \n", rcps[i] );
-         UF_print_syslog( syslog_message,    
-                          FALSE );
-         /* 
-         ** Go ahead an continue cycling the components, In an assembly where
-         ** there is a subassembly, the subassembly will not have any charx's
-         */
-         continue;
-      }
+   //      sprintf( syslog_message, "Failed to find any characteristics rcp: %u \n", rcps[i] );
+   //      UF_print_syslog( syslog_message,    
+   //                       FALSE );
+   //      /* 
+   //      ** Go ahead an continue cycling the components, In an assembly where
+   //      ** there is a subassembly, the subassembly will not have any charx's
+   //      */
+   //      continue;
+   //   }
 
-      write_component_id( charx_count, charx_list, pcf_stream );
-      
-      get_center_and_branch_points_for_tee_set_on( rcps[i], charx_count, 
-                                                   charx_list, 
-                                                   tso_center, tso_branch);
+   //   write_component_id( charx_count, charx_list, pcf_stream );
+   //   
+   //   get_center_and_branch_points_for_tee_set_on( rcps[i], charx_count, 
+   //                                                charx_list, 
+   //                                                tso_center, tso_branch);
 
-	  //Add by CJ
-	  coordinate_transform(tso_branch,tso_branch_r);
-	  coordinate_transform(tso_center,tso_center_r);
+	  ////Add by CJ
+	  //coordinate_transform(tso_branch,tso_branch_r);
+	  //coordinate_transform(tso_center,tso_center_r);
 
-      /*sprintf( tso_pcf_string, COMP_BRANCH1_POINT_FMT, 
-          tso_branch[0], tso_branch[1], tso_branch[2], 
-          charx_list[index].value.r_value );*/
-	  sprintf( tso_pcf_string, COMP_BRANCH1_POINT_FMT, 
-          tso_branch_r[0], tso_branch_r[1], tso_branch_r[2], 
-          charx_list[index].value.r_value );
+   //   /*sprintf( tso_pcf_string, COMP_BRANCH1_POINT_FMT, 
+   //       tso_branch[0], tso_branch[1], tso_branch[2], 
+   //       charx_list[index].value.r_value );*/
+	  //sprintf( tso_pcf_string, COMP_BRANCH1_POINT_FMT, 
+   //       tso_branch_r[0], tso_branch_r[1], tso_branch_r[2], 
+   //       charx_list[index].value.r_value );
 
-      write_string( tso_pcf_string, pcf_stream );
-      strcpy ( tso_pcf_string, "" );
+   //   write_string( tso_pcf_string, pcf_stream );
+   //   strcpy ( tso_pcf_string, "" );
 
-      /*sprintf( tso_pcf_string, COMP_CENTER_POINT_FMT, 
-          tso_center[0], tso_center[1], tso_center[2]);*/
-	  sprintf( tso_pcf_string, COMP_CENTER_POINT_FMT, 
-          tso_center_r[0], tso_center_r[1], tso_center_r[2]);
-      write_string ( tso_pcf_string, pcf_stream );
-      strcpy ( tso_pcf_string, "" );
+   //   /*sprintf( tso_pcf_string, COMP_CENTER_POINT_FMT, 
+   //       tso_center[0], tso_center[1], tso_center[2]);*/
+	  //sprintf( tso_pcf_string, COMP_CENTER_POINT_FMT, 
+   //       tso_center_r[0], tso_center_r[1], tso_center_r[2]);
+   //   write_string ( tso_pcf_string, pcf_stream );
+   //   strcpy ( tso_pcf_string, "" );
 
-      write_skey( charx_count, charx_list, pcf_stream ); 
-      
-      write_item_code( charx_count, charx_list, rcps[i], pcf_stream,
-                       material_stream, &item_code_char, &n_items );
-      
-      write_weight( charx_count, charx_list, pcf_stream); 
-      if( charx_count > 0 )
-      {
-         status = UF_ROUTE_free_charx_array( charx_count,
-                                             charx_list );
-         CHECK_STATUS
+   //   write_skey( charx_count, charx_list, pcf_stream ); 
+   //   
+   //   write_item_code( charx_count, charx_list, rcps[i], pcf_stream,
+   //                    material_stream, &item_code_char, &n_items );
+   //   
+   //   write_weight( charx_count, charx_list, pcf_stream); 
+   //   if( charx_count > 0 )
+   //   {
+   //      status = UF_ROUTE_free_charx_array( charx_count,
+   //                                          charx_list );
+   //      CHECK_STATUS
   
-         charx_count = 0;
-         charx_list = NULL;
-      }
-   }
+   //      charx_count = 0;
+   //      charx_list = NULL;
+   //   }
+   //}
 
-   if( stocks != NULL )
-   {
-      UF_free( stocks );
-   }
    if ( num_rcps )
       UF_free ( rcps );
    
    if ( item_code_char != NULL )
    {
-      for ( i = 0; i < n_items; i++ )
+      for ( int i = 0; i < n_items; i++ )
          UF_free ( item_code_char[i] );
 
       UF_free ( item_code_char );
@@ -5334,8 +5412,7 @@ void pcf_generation::write_flange_blind_point(tag_t part_tag, tag_t comp_tag, FI
 		}
 	}
 	if(is_X0002)
-	{
-		pointinfo point_temp;
+	{pointinfo point_temp;
 		point_temp.end_point[0] = endpoint_1[0];
 		point_temp.end_point[1] = endpoint_1[1];
 		point_temp.end_point[2] = endpoint_1[2];
@@ -5346,6 +5423,7 @@ void pcf_generation::write_flange_blind_point(tag_t part_tag, tag_t comp_tag, FI
 		point_temp.end_point[2] = endpoint_2[2];
 		point_temp.diameter = outdiameter;
 		control_point.push_back(point_temp);
+		
 	}
 	UF_ATTR_free_user_attribute_info_strings(&info);
 	UF_ATTR_free_user_attribute_info_strings(&name_info);
@@ -5487,3 +5565,201 @@ void pcf_generation::write_flange_point(tag_t part_tag, tag_t comp_tag, FILE * p
 	UF_ATTR_free_user_attribute_info_strings(&info);
 	UF_free( ports );
 }
+
+void pcf_generation::write_elbow_point(tag_t part_tag, tag_t comp_tag,  FILE * pcf_stream )
+{
+	int status = ERROR_OK;
+	char pcf_string[MAX_LINE_BUFSIZE];
+
+	double end_pt1[3] = {0};
+	double end_pt2[3] = {0};
+	double end_pt1_r[3] = {0};
+	double end_pt2_r[3] = {0};
+
+	double vec1[3] = {0};
+	double vec2[3] = {0};
+	double center_point[3] = {0};
+	double corner_point[3] = {0};
+	double pos[3];
+	double angle = 0;
+
+	int num_anchors = 0;
+	tag_t *anchor_tags = NULL;
+
+	double dist = 0.0;
+
+	double indiameter = 0.0;
+	double outdiameter = 0.0;
+
+	tag_t *port_tags = NULL;
+	int num_ports = 0;
+	
+	tag_t start_port = NULL_TAG;
+	tag_t end_port = NULL_TAG;
+
+	bool is_cut_elbow = false;
+
+	UF_ROUTE_charx_p_t charx_list;
+	int charx_count;
+
+	status = UF_ROUTE_ask_characteristics( comp_tag,  UF_ROUTE_CHARX_TYPE_ANY,  &charx_count,  &charx_list);
+   
+	/*
+	** Find the component ports and use them as the end points and
+	** branch points. 
+	*/
+	
+	UF_ROUTE_ask_object_port( comp_tag, &num_ports, &port_tags );
+	start_port = port_tags[0];
+	end_port = port_tags[1];
+	find_start_and_end_port (port_tags, &start_port, &end_port );
+	
+	status = UF_ROUTE_ask_port_position( start_port, end_pt1); 
+	CHECK_STATUS
+	status = UF_ROUTE_ask_port_position( end_port, end_pt2);
+	CHECK_STATUS
+
+	status = UF_ROUTE_ask_port_align_vector(start_port, vec1);
+	CHECK_STATUS
+	status = UF_ROUTE_ask_port_align_vector(end_port, vec2);
+	CHECK_STATUS
+
+	coordinate_transform(end_pt1, end_pt1_r);
+	coordinate_transform(end_pt2, end_pt2_r);
+
+	ask_comp_anchors( part_tag, comp_tag, &num_anchors, &anchor_tags);
+	if (num_anchors >= 1)
+	{
+		status = UF_ROUTE_ask_anchor_position( anchor_tags[0], pos);  
+		CHECK_STATUS
+		coordinate_transform(pos, corner_point);
+	}
+
+	center_point[0] = end_pt1_r[0] + end_pt2_r[0] - corner_point[0];
+	center_point[1] = end_pt1_r[1] + end_pt2_r[1] - corner_point[1];
+	center_point[2] = end_pt1_r[2] + end_pt2_r[2] - corner_point[2];
+
+	indiameter  = determine_in_diameter  ( comp_tag );
+    outdiameter = determine_out_diameter ( comp_tag, indiameter );
+
+	dist = line_length(end_pt1_r, end_pt2_r);
+	
+	bool end_1 = false;
+	bool end_2 = false;
+	for(int i = 0; i < pipe_endpoint.size(); i++ )
+	{
+		if(check_same_point(pipe_endpoint[i].end_point, end_pt1_r))
+		{
+			end_1 = true;
+		}
+		if(check_same_point(pipe_endpoint[i].end_point, end_pt2_r))
+		{
+			end_2 = true;
+		}
+
+	}
+	
+	if(cut_elbow_label.size()>0)
+	{	
+		if(end_1 && !end_2)
+		{
+			for(int i = 0; i < cut_elbow_label.size(); i++ )
+			{
+				if(line_length(cut_elbow_label[i].end_point, end_pt2_r) < dist)
+				{
+					end_pt2_r[0] = cut_elbow_label[i].end_point[0];
+					end_pt2_r[1] = cut_elbow_label[i].end_point[1];
+					end_pt2_r[2] = cut_elbow_label[i].end_point[2];
+					is_cut_elbow = true;
+				}
+			}
+		}
+
+		if(!end_1 && end_2)
+		{
+			for(int i = 0; i < cut_elbow_label.size(); i++ )
+			{
+				if(line_length(cut_elbow_label[i].end_point, end_pt1_r) < dist)
+				{
+					end_pt1_r[0] = cut_elbow_label[i].end_point[0];
+					end_pt1_r[1] = cut_elbow_label[i].end_point[1];
+					end_pt1_r[2] = cut_elbow_label[i].end_point[2];
+					is_cut_elbow = true;
+				}
+			}
+		}
+	}
+
+	write_end_points( end_pt1_r, end_pt2_r, indiameter, outdiameter, pcf_stream );
+
+	if(is_cut_elbow)
+	{
+		double n1[3];
+		double n2[3];
+		n1[0] = end_pt1_r[0] - center_point[0];
+		n1[1] = end_pt1_r[1] - center_point[1];
+		n1[2] = end_pt1_r[2] - center_point[2];
+		n2[0] = end_pt2_r[0] - center_point[0];
+		n2[1] = end_pt2_r[1] - center_point[1];
+		n2[2] = end_pt2_r[2] - center_point[2];
+		angle = 57.29578 * acos((n1[0]*n2[0]+n1[1]*n2[1]+n1[2]*n2[2])/(sqrt(n1[0]*n1[0]+n1[1]*n1[1]+n1[2]*n1[2])*sqrt(n2[0]*n2[0]+n2[1]*n2[1]+n2[2]*n2[2])));
+		
+		write_center_point( part_tag, comp_tag, charx_count, charx_list, pcf_stream );     
+		sprintf(pcf_string, "    ANGLE %.2f\n", angle);
+		write_string(pcf_string, pcf_stream);
+
+
+	}else
+	{
+		write_center_point( part_tag, comp_tag, charx_count, charx_list, pcf_stream );      
+		write_angle( charx_count, charx_list, pcf_stream );
+	}
+
+	UF_free( port_tags );
+
+}
+
+void pcf_generation::write_comp_spool_identifier(tag_t comp_tag,  FILE * pcf_stream )
+{
+	int status = 0;
+	char pcf_string[MAX_LINE_BUFSIZE];
+	UF_ATTR_info_t info;
+	UF_ATTR_info_t info_name;
+	logical has_attr = false;
+
+	UF_ATTR_get_user_attribute_with_title_and_type(comp_tag, "KIT", UF_ATTR_string, UF_ATTR_NOT_ARRAY, &info, &has_attr);
+	if(has_attr){
+		sprintf(pcf_string,"    SPOOL-IDENTIFIER  %s\n", info.string_value);
+		write_string(pcf_string, pcf_stream);
+	}else{
+		UF_ATTR_get_user_attribute_with_title_and_type(comp_tag, "MEMBER_NAME", UF_ATTR_string, UF_ATTR_NOT_ARRAY, &info_name, &has_attr);
+		if(has_attr){
+			sprintf(pcf_string,"%s has no SPOOL-IDENTIFIER", info_name.string_value);
+			uc1601(pcf_string,1);
+		}
+	}
+
+}
+
+//void pcf_generation::write_stock_spool_identifier( int charx_count, UF_ROUTE_charx_p_t charx_list, FILE * pcf_stream )
+//{ 
+//	int status = 0;
+//	int index = 0; 
+//	char pcf_string[MAX_LINE_BUFSIZE];
+//
+//	status = UF_ROUTE_find_title_in_charx( charx_count, charx_list, "KIT", &index );
+//	if (status != ERROR_OK && index > -1)
+//	{
+//		sprintf(pcf_string,"SPOOL-IDENTIFIER  %s", charx_list[index].value.s_value);
+//		write_string(pcf_string, pcf_stream);
+//	}else
+//	{
+//		status = UF_ROUTE_find_title_in_charx( charx_count, charx_list, "MEMBER_NAME", &index );
+//		if (status != ERROR_OK && index > -1)
+//		{
+//			sprintf(pcf_string,"%s has no SPOOL-IDENTIFIER", charx_list[index].value.s_value);
+//			uc1601(pcf_string,1);
+//		}
+//	}
+//
+//}

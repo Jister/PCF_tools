@@ -178,6 +178,9 @@ public:
 	void get_stub_end_point(tag_t comp_tag);
 	void write_flange_blind_point(tag_t part_tag, tag_t comp_tag, FILE * pcf_stream );
 	void write_flange_point(tag_t part_tag, tag_t comp_tag, FILE * pcf_stream );
+	void write_elbow_point(tag_t part_tag, tag_t comp_tag,  FILE * pcf_stream );
+	void write_comp_spool_identifier(tag_t comp_tag,  FILE * pcf_stream );
+	//void write_stock_spool_identifier( int charx_count, UF_ROUTE_charx_p_t charx_list, FILE * pcf_stream );
 	void write_support_coords ( tag_t part_tag, tag_t comp_tag, FILE * pcf_stream );
 	void get_lateral_butt_weld_center_point ( double pnt1[3], double pnt2[3], double vec1[3], double vec2[3], double butt_center[3] );
 	void adjust_end_pts_for_tee_set_on ( tag_t  end_rcps[2], double end_pt1[3], double end_pt2[3] );
@@ -209,6 +212,8 @@ public:
 private:
 	std::vector<pointinfo> control_point;
 	std::vector<pointinfo> stubend_point;
+	std::vector<pointinfo> pipe_endpoint;
+	std::vector<pointinfo> cut_elbow_label;
 	std::vector<weldinfo> additional_weld;
 	Part *workPart;
 	Part *displayPart;
